@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<hgroup>
+<h1>{{ post.title }}</h1>
+<small>Written on {{ post.created_at }}{% if post.tags %}<br/>{% for t in tags %}{{ t }} {% endfor %}{% endif %}</small>
+</hgroup>
+
+{{ post.content|safe }}
+
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Latest</h2>
+
+<div>
+{% with posts.0 as latest_post %}
+<h2>{{ latest_post.title }}</h2>
+<div class="small muted">{{ latest_post.published_at }}</div>
+<p>{{ latest_post.blurb }} &rarr;</p>
+{% endwith %}
+</div>
+
+<hr/>
+
+<h2>Topics</h2>
+{% for t in tags %}
+{{ t.name }}{% if not forloop.last %}, {% endif %}
+{% endfor %}
+
+<hr/>
+
+<h2>Writing</h2>
+<ul>
+{% for post in posts %}
+<li><code>{{ post.published_at | date:"Y m d" }}</code><a href={{ post.get_absolute_url }}>{{ post.title }}</a></li>
+{% endfor %}
+</ul>
+
+{% endblock %}
