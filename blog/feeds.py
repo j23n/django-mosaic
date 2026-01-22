@@ -1,5 +1,4 @@
 from django.contrib.syndication.views import Feed
-from django.urls import reverse
 from django.conf import settings
 from django.templatetags.static import static
 
@@ -24,7 +23,7 @@ class PostFeed(Feed):
     # to apply the stylesheet
     def __call__(self, request, *args, **kwargs):
         response = super().__call__(request, *args, **kwargs)
-        response['Content-Type'] = 'application/xml; charset=utf-8'
+        response["Content-Type"] = "application/xml; charset=utf-8"
         return response
 
     stylesheets = [static("feed/style.xslt")]

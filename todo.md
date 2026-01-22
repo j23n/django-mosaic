@@ -1,0 +1,1 @@
+- validate tag namespace on the model admin form for post. Posts should only be created with tags from the same namespace

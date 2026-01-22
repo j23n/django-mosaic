@@ -5,9 +5,11 @@
 
 <div>
 {% with posts.0 as latest_post %}
+<a href="{{ latest_post.get_absolute_url }}" class="plain">
 <h2>{{ latest_post.title }}</h2>
 <div class="small muted">{{ latest_post.published_at }}</div>
-<p>{{ latest_post.blurb }} &rarr;</p>
+<p>{{ latest_post.summary }} &rarr;</p>
+</a>
 {% endwith %}
 </div>
 
@@ -15,7 +17,7 @@
 
 <h2>Topics</h2>
 {% for t in tags %}
-{{ t.name }}{% if not forloop.last %}, {% endif %}
+<a href={{ t.get_absolute_url }}>{{ t.name }}</a>{% if not forloop.last %}, {% endif %}
 {% endfor %}
 
 <hr/>
@@ -23,7 +25,7 @@
 <h2>Writing</h2>
 <ul>
 {% for post in posts %}
-<li><code>{{ post.published_at | date:"Y m d" }}</code><a href={{ post.get_absolute_url }}>{{ post.title }}</a></li>
+{% include "post-detail-include.html" %}
 {% endfor %}
 </ul>
 

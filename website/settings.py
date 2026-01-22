@@ -11,12 +11,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 CONSTANTS = {
-    "site" : {
-        "title": "A mosaic site",
-        "description": "A private space on the internet"
-    }
+    "site": {"title": "A mosaic site", "description": "A private space on the internet"}
 }
-
 
 
 from pathlib import Path
@@ -133,3 +129,29 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
+
+
+LOGGING = {
+    "version": 1,
+    "handlers": {
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django_magic_authorization": {
+            "level": "DEBUG",
+            "handlers": ["console"],
+        },
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        "django.server": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
