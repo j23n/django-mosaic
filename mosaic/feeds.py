@@ -24,12 +24,3 @@ class PostFeed(Feed):
 
     def item_pubdate(self, item):
         return item.published_at
-
-    # Firefox seems to require application/xml instead of application/rss+xml
-    # to apply the stylesheet
-    def __call__(self, request, *args, **kwargs):
-        response = super().__call__(request, *args, **kwargs)
-        response["Content-Type"] = "application/xml; charset=utf-8"
-        return response
-
-    stylesheets = [static("feed/style.xslt")]
