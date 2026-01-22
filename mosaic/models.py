@@ -1,3 +1,6 @@
+import bleach
+import markdown
+
 import django.utils.timezone
 from django.utils.text import slugify
 from django.urls import reverse
@@ -36,7 +39,7 @@ class Post(models.Model):
         if self.is_draft or not self.slug:
             self.slug = slugify(self.title)
         if not self.summary:
-            self.summary = self.content[:100]
+            self.summary = bleach.clean(markdown.markdown(self.content), strip=True, tags={})[:200]
         if not self.is_draft and not self.published_at:
             self.published_at = django.utils.timezone.now()
         elif self.is_draft:

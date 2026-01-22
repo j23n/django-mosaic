@@ -3,7 +3,7 @@
 {% block content %}
 <hgroup>
 <h1>{{ post.title }}</h1>
-<small>Written on {{ post.created_at }}{% if post.tags %}<br/>{% for t in post.tags.all %}<a href={{ t.get_absolute_url }}>{{ t.name }}</a> {% endfor %}{% endif %}</small>
+<small>Written on {{ post.published_at}}{% if post.tags %}<br/>{% for t in post.tags.all %}<a href={{ t.get_absolute_url }}>{{ t.name }}</a> {% endfor %}{% endif %}</small>
 </hgroup>
 
 {{ post.content|markdownify }}

@@ -9,7 +9,7 @@
 <a href="{{ latest_post.get_absolute_url }}" class="plain">
 <h2>{{ latest_post.title }}</h2>
 <div class="small muted">{{ latest_post.published_at }}</div>
-{{ latest_post.content|markdownify }}
+<p>{{ latest_post.summary }} ...</p>
 </a>
 {% endwith %}
 </div>

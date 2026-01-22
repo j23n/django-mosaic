@@ -1,4 +1,3 @@
-import markdown
 from pathlib import Path
 import yaml
 import dateutil
@@ -8,7 +7,7 @@ from django.core.management.base import BaseCommand
 from django.utils.text import slugify
 from mosaic.models import Post, Tag, Namespace
 
-EXPECTED_KEYWORDS = ["title", "date"]
+EXPECTED_KEYWORDS = ["title", "date", "draft"]
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +36,13 @@ class Command(BaseCommand):
                             f"Could not find all expected keywords in post metadata. Expected {EXPECTED_KEYWORDS}, found {header.keys()}"
                         )
 
+                    slug = header.get("slug", slugify(header["title"]))
+
                     tags = []
-                    header_tags = header.get("tags", [])
-                    header_tags.extend(header.get("categories"))
+                    header_tags = [t.strip() for t in header.get("tags", "").split(",") if t]
+                    header_categories = [c.strip() for c in header.get("categories", "").split(",") if c]
+                    header_tags.extend(header_categories)
+
                     if header_tags:
                         for t in header_tags:
                             if not isinstance(t, str):
@@ -51,12 +54,11 @@ class Command(BaseCommand):
                             t, _ = Tag.objects.get_or_create(name=t, namespace=ns)
                             tags.append(t)
 
-                    content = markdown.markdown(content, extensions=["extra"])
                     post = Post(
                         title=header["title"],
-                        is_draft=True,
+                        is_draft=header["draft"],
                         published_at=dateutil.parser.parse(header["date"]),
-                        slug=slugify(header["title"]),
+                        slug=slug,
                         namespace=ns,
                         summary=header.get("description", ""),
                         content=content,
@@ -64,5 +66,6 @@ class Command(BaseCommand):
                     post.save()
                     for t in tags:
                         post.tags.add(t)
+                    logger.info(f"Created post {post} with tags {tags}")
                 except Exception as e:
                     logger.error(f"Could not import {file}: {e}", exc_info=True)
