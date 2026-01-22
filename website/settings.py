@@ -1,3 +1,5 @@
+from pathlib import Path
+
 """
 Django settings for website project.
 
@@ -14,8 +16,6 @@ CONSTANTS = {
     "site": {"title": "A mosaic site", "description": "A private space on the internet"}
 }
 
-
-from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

@@ -1,6 +1,5 @@
 from django.contrib.syndication.views import Feed
 from django.conf import settings
-from django.templatetags.static import static
 
 from mosaic.models import Post, Namespace
 
