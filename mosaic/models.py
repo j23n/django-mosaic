@@ -1,3 +1,5 @@
+import django.utils.timezone
+from django.utils.text import slugify
 from django.urls import reverse
 from django.db import models
 
@@ -5,11 +7,17 @@ from django.db import models
 class Namespace(models.Model):
     name = models.SlugField(max_length=256, unique=True, blank=False, null=False)
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return f"<Namespace {self.name}"
+
 
 class Post(models.Model):
     title = models.CharField(max_length=512, blank=False, null=False, unique=True)
     content = models.TextField()
-    slug = models.SlugField(max_length=256, blank=False, null=False, unique=True)
+    slug = models.SlugField(max_length=256, blank=True, null=False, unique=True)
     summary = models.CharField(max_length=1024, null=False, blank=True)
 
     namespace = models.ForeignKey(
@@ -17,15 +25,22 @@ class Post(models.Model):
     )
     is_draft = models.BooleanField(default=True, blank=False, null=False)
 
-    tags = models.ManyToManyField("Tag")
+    tags = models.ManyToManyField("Tag", blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True, blank=False, null=False)
-    published_at = models.DateTimeField(blank=True, null=False)
+    published_at = models.DateTimeField(blank=True, null=True)
     changed_at = models.DateTimeField(auto_now=True, blank=False, null=False)
 
     def save(self, *args, **kwargs):
+        # no longer update the slug once it's been published
+        if self.is_draft or not self.slug:
+            self.slug = slugify(self.title)
         if not self.summary:
             self.summary = self.content[:100]
+        if not self.is_draft and not self.published_at:
+            self.published_at = django.utils.timezone.now()
+        elif self.is_draft:
+            self.published_at = None
         return super().save(*args, **kwargs)
 
     def get_absolute_url(self):
