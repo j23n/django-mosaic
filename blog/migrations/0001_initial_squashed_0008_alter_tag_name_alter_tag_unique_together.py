@@ -8,6 +8,7 @@ from django.db import migrations, models
 def add_default_namespace(apps, schema_editor):
     Namespace = apps.get_model("blog", "Namespace")
     Namespace.objects.create(name="public")
+    Namespace.objects.create(name="private")
 
 class Migration(migrations.Migration):
 
