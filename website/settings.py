@@ -16,6 +16,13 @@ CONSTANTS = {
     "site": {"title": "A mosaic site", "description": "A private space on the internet"}
 }
 
+MARKDOWNIFY = {
+    "default": {
+        "MARKDOWN_EXTENSIONS": ["markdown.extensions.extra"],
+        "BLEACH": False,
+    }
+}
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,6 +49,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "markdownify.apps.MarkdownifyConfig",
     "django_magic_authorization",
     "mosaic",
 ]
@@ -141,7 +149,7 @@ LOGGING = {
     },
     "loggers": {
         "django_magic_authorization": {
-            "level": "DEBUG",
+            "level": "INFO",
             "handlers": ["console"],
         },
         "django": {

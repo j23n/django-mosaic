@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load markdownify %}
 
 {% block content %}
 <h2>Latest</h2>
@@ -8,7 +9,7 @@
 <a href="{{ latest_post.get_absolute_url }}" class="plain">
 <h2>{{ latest_post.title }}</h2>
 <div class="small muted">{{ latest_post.published_at }}</div>
-<p>{{ latest_post.summary }} &rarr;</p>
+{{ latest_post.content|markdownify }}
 </a>
 {% endwith %}
 </div>

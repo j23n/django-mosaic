@@ -3,8 +3,8 @@ from mosaic.models import Post, Tag
 
 
 class PostAdmin(admin.ModelAdmin):
-    readonly_fields = ["created_at"]
-    list_display = ["created_at", "changed_at", "is_draft", "title", "slug"]
+    readonly_fields = ["created_at", "slug", "published_at"]
+    list_display = ["title", "created_at", "namespace", "is_draft", "published_at"]
 
 
 class TagAdmin(admin.ModelAdmin):

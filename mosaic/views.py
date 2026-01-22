@@ -3,9 +3,13 @@ from django.conf import settings
 from mosaic.models import Post, Tag
 
 
+def _get_posts(namespace="public"):
+    return Post.objects.filter(namespace__name=namespace, is_draft=False)
+
+
 def home(request):
-    posts = Post.objects.filter(namespace__name="public")
-    tags = Tag.objects.filter(namespace__name="public")
+    posts = _get_posts()
+    tags = Tag.objects.filter(post__in=posts)
 
     return render(
         request,
@@ -15,7 +19,7 @@ def home(request):
 
 
 def post_list(request, namespace):
-    posts = Post.objects.filter(namespace__name=namespace)
+    posts = _get_posts(namespace)
     return render(
         request, "post-list.html", {"posts": posts, "CONSTANTS": settings.CONSTANTS}
     )
@@ -32,7 +36,7 @@ def post_detail(request, namespace, year, post_slug):
 def tag_detail(request, namespace, name):
     tag = get_object_or_404(Tag, name=name, namespace__name=namespace)
 
-    posts = Post.objects.filter(tags__name=tag)
+    posts = _get_posts(namespace).filter(tags__name=tag)
 
     return render(
         request,
