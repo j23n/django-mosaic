@@ -15,5 +15,7 @@ urlpatterns = [
     path("about", about, name="about"),
     path("", home, name="home"),
     path("<slug:namespace>/", include(mosaic_patterns)),
-    protected_path("private/", include(mosaic_patterns), kwargs={"namespace": "private"}),
+    protected_path(
+        "private/", include(mosaic_patterns), kwargs={"namespace": "private"}
+    ),
 ]

@@ -10,68 +10,115 @@ def add_default_namespace(apps, schema_editor):
     Namespace.objects.create(name="public")
     Namespace.objects.create(name="private")
 
+
 class Migration(migrations.Migration):
 
-    replaces = [('mosaic', '0001_initial'), ('mosaic', '0002_remove_post_category_alter_post_options_and_more'), ('mosaic', '0003_post__summary'), ('mosaic', '0004_alter_post__summary'), ('mosaic', '0005_tag_is_public'), ('mosaic', '0006_namespace_remove_post__summary_remove_post_is_public_and_more'), ('mosaic', '0007_post_namespace_tag_namespace'), ('mosaic', '0008_alter_tag_name_alter_tag_unique_together')]
-
-    dependencies = [
+    replaces = [
+        ("mosaic", "0001_initial"),
+        ("mosaic", "0002_remove_post_category_alter_post_options_and_more"),
+        ("mosaic", "0003_post__summary"),
+        ("mosaic", "0004_alter_post__summary"),
+        ("mosaic", "0005_tag_is_public"),
+        (
+            "mosaic",
+            "0006_namespace_remove_post__summary_remove_post_is_public_and_more",
+        ),
+        ("mosaic", "0007_post_namespace_tag_namespace"),
+        ("mosaic", "0008_alter_tag_name_alter_tag_unique_together"),
     ]
+
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Tag',
+            name="Tag",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=256, unique=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=256, unique=True)),
             ],
         ),
         migrations.CreateModel(
-            name='Namespace',
+            name="Namespace",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.SlugField(max_length=256, unique=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.SlugField(max_length=256, unique=True)),
             ],
         ),
         migrations.RunPython(
             code=add_default_namespace,
         ),
         migrations.CreateModel(
-            name='Post',
+            name="Post",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(max_length=512, unique=True)),
-                ('content', models.TextField()),
-                ('slug', models.SlugField(max_length=256, unique=True)),
-                ('is_draft', models.BooleanField(default=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('changed_at', models.DateTimeField(auto_now=True)),
-                ('tags', models.ManyToManyField(to='mosaic.tag')),
-                ('published_at', models.DateTimeField(blank=True, default=django.utils.timezone.now)),
-                ('summary', models.CharField(blank=True, max_length=1024)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("title", models.CharField(max_length=512, unique=True)),
+                ("content", models.TextField()),
+                ("slug", models.SlugField(max_length=256, unique=True)),
+                ("is_draft", models.BooleanField(default=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("changed_at", models.DateTimeField(auto_now=True)),
+                ("tags", models.ManyToManyField(to="mosaic.tag")),
+                (
+                    "published_at",
+                    models.DateTimeField(blank=True, default=django.utils.timezone.now),
+                ),
+                ("summary", models.CharField(blank=True, max_length=1024)),
             ],
             options={
-                'ordering': ['-published_at'],
+                "ordering": ["-published_at"],
             },
         ),
         migrations.AddField(
-            model_name='post',
-            name='namespace',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.PROTECT, to='mosaic.namespace'),
+            model_name="post",
+            name="namespace",
+            field=models.ForeignKey(
+                default=1,
+                on_delete=django.db.models.deletion.PROTECT,
+                to="mosaic.namespace",
+            ),
             preserve_default=False,
         ),
         migrations.AddField(
-            model_name='tag',
-            name='namespace',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.PROTECT, to='mosaic.namespace'),
+            model_name="tag",
+            name="namespace",
+            field=models.ForeignKey(
+                default=1,
+                on_delete=django.db.models.deletion.PROTECT,
+                to="mosaic.namespace",
+            ),
             preserve_default=False,
         ),
         migrations.AlterField(
-            model_name='tag',
-            name='name',
+            model_name="tag",
+            name="name",
             field=models.CharField(max_length=256),
         ),
         migrations.AlterUniqueTogether(
-            name='tag',
-            unique_together={('name', 'namespace')},
+            name="tag",
+            unique_together={("name", "namespace")},
         ),
     ]
