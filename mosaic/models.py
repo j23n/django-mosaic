@@ -36,7 +36,7 @@ class Post(models.Model):
 
     def save(self, *args, **kwargs):
         # no longer update the slug once it's been published
-        if self.is_draft or not self.slug:
+        if self.is_draft and not self.slug:
             self.slug = slugify(self.title)
         if not self.summary:
             self.summary = bleach.clean(markdown.markdown(self.content), strip=True, tags={})[:200]
