@@ -5,14 +5,14 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link rel="stylesheet" href={% static "css/style.css" %}>
-	<title>{% block title %}{% endblock %}</title>
+	<title>{{ CONSTANTS.site.title }}{% block title %}{% endblock %}</title>
 	{% block head_extra %}{% endblock %}
 </head>
 <body>
 	<header class="wrap">
 		<nav>
-			<a href="/">Mosaic</a>
-			<a href="/about">About</a>
+			<a href={% url 'home' %}>Mosaic</a>
+			<a href={% url 'about' %}>About</a>
 			<a href={% url 'post-list' 'private' %}>Private</a>
 		</nav>
 	</header>
