@@ -6,13 +6,13 @@ from django.db import migrations, models
 
 
 def add_default_namespace(apps, schema_editor):
-    Namespace = apps.get_model("blog", "Namespace")
+    Namespace = apps.get_model("mosaic", "Namespace")
     Namespace.objects.create(name="public")
     Namespace.objects.create(name="private")
 
 class Migration(migrations.Migration):
 
-    replaces = [('blog', '0001_initial'), ('blog', '0002_remove_post_category_alter_post_options_and_more'), ('blog', '0003_post__summary'), ('blog', '0004_alter_post__summary'), ('blog', '0005_tag_is_public'), ('blog', '0006_namespace_remove_post__summary_remove_post_is_public_and_more'), ('blog', '0007_post_namespace_tag_namespace'), ('blog', '0008_alter_tag_name_alter_tag_unique_together')]
+    replaces = [('mosaic', '0001_initial'), ('mosaic', '0002_remove_post_category_alter_post_options_and_more'), ('mosaic', '0003_post__summary'), ('mosaic', '0004_alter_post__summary'), ('mosaic', '0005_tag_is_public'), ('mosaic', '0006_namespace_remove_post__summary_remove_post_is_public_and_more'), ('mosaic', '0007_post_namespace_tag_namespace'), ('mosaic', '0008_alter_tag_name_alter_tag_unique_together')]
 
     dependencies = [
     ]
@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
                 ('is_draft', models.BooleanField(default=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('changed_at', models.DateTimeField(auto_now=True)),
-                ('tags', models.ManyToManyField(to='blog.tag')),
+                ('tags', models.ManyToManyField(to='mosaic.tag')),
                 ('published_at', models.DateTimeField(blank=True, default=django.utils.timezone.now)),
                 ('summary', models.CharField(blank=True, max_length=1024)),
             ],
@@ -56,13 +56,13 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='post',
             name='namespace',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.PROTECT, to='blog.namespace'),
+            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.PROTECT, to='mosaic.namespace'),
             preserve_default=False,
         ),
         migrations.AddField(
             model_name='tag',
             name='namespace',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.PROTECT, to='blog.namespace'),
+            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.PROTECT, to='mosaic.namespace'),
             preserve_default=False,
         ),
         migrations.AlterField(

@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("blog", "0001_initial_squashed_0008_alter_tag_name_alter_tag_unique_together"),
+        ("mosaic", "0001_initial_squashed_0008_alter_tag_name_alter_tag_unique_together"),
     ]
 
     operations = [

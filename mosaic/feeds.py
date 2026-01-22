@@ -2,7 +2,7 @@ from django.contrib.syndication.views import Feed
 from django.conf import settings
 from django.templatetags.static import static
 
-from blog.models import Post, Namespace
+from mosaic.models import Post, Namespace
 
 
 class PostFeed(Feed):

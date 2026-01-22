@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_magic_authorization",
-    "blog",
+    "mosaic",
 ]
 
 MIDDLEWARE = [
@@ -64,7 +64,7 @@ TEMPLATES = [
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
             BASE_DIR / "templates",
-            BASE_DIR / "blog" / "templates",
+            BASE_DIR / "mosaic" / "templates",
         ],
         "APP_DIRS": True,
         "OPTIONS": {

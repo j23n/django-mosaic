@@ -4,7 +4,7 @@ import yaml
 import dateutil
 
 from django.core.management.base import BaseCommand
-from blog.models import Post
+from mosaic.models import Post
 
 
 class Command(BaseCommand):
