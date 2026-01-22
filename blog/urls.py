@@ -8,7 +8,7 @@ blog_patterns = [
     path("tag/<str:name>", tag_detail, name="tag-detail"),
     path("posts", post_list, name="post-list"),
     path("posts/<int:year>/<str:post_slug>", post_detail, name="post-detail"),
-    path("feed", PostFeed()),
+    path("feed", PostFeed(), name="feed"),
 ]
 
 urlpatterns = [
