@@ -56,7 +56,7 @@ class Command(BaseCommand):
 
                     post = Post(
                         title=header["title"],
-                        is_draft=header["draft"],
+                        is_published=not header["draft"],
                         published_at=dateutil.parser.parse(header["date"]),
                         slug=slug,
                         namespace=ns,

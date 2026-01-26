@@ -26,7 +26,7 @@ class Post(models.Model):
     namespace = models.ForeignKey(
         "Namespace", on_delete=models.PROTECT, blank=False, null=False
     )
-    is_draft = models.BooleanField(default=True, blank=False, null=False)
+    is_published = models.BooleanField(default=False, blank=False, null=False)
 
     tags = models.ManyToManyField("Tag", blank=True)
 
@@ -36,13 +36,13 @@ class Post(models.Model):
 
     def save(self, *args, **kwargs):
         # no longer update the slug once it's been published
-        if self.is_draft and not self.slug:
+        if not self.is_published and not self.slug:
             self.slug = slugify(self.title)
         if not self.summary:
             self.summary = bleach.clean(markdown.markdown(self.content), strip=True, tags={})[:200]
-        if not self.is_draft and not self.published_at:
+        if self.is_published and not self.published_at:
             self.published_at = django.utils.timezone.now()
-        elif self.is_draft:
+        elif not self.is_published:
             self.published_at = None
         return super().save(*args, **kwargs)
 
@@ -52,10 +52,11 @@ class Post(models.Model):
         )
 
     def __str__(self):
-        return f"{self.title} - {self.created_at}"
+        return f"{self.title}"
 
     def __repr__(self):
-        return f"<Post {self.title} - {self.created_at} [{self.namespace.name}]>"
+        date = self.published_at or self.created_at
+        return f"<Post {self.title} - {date.year} [{self.namespace.name}]>"
 
     class Meta:
         ordering = ["-published_at"]

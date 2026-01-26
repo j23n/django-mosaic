@@ -4,7 +4,7 @@ from mosaic.models import Post, Tag
 
 
 def _get_posts(namespace="public"):
-    return Post.objects.filter(namespace__name=namespace, is_draft=False)
+    return Post.objects.filter(namespace__name=namespace, is_published=False)
 
 
 def home(request):
