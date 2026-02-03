@@ -15,12 +15,18 @@ class Namespace(models.Model):
         return self.name
 
     def __repr__(self):
-        return f"<Namespace {self.name}"
+        return f"<Namespace {self.name}>"
 
 
 class Author(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     h_card = models.JSONField()
+
+    def __str__(self):
+        return self.user.username
+
+    def __repr__(self):
+        return f"<Author {self.user.username}>"
 
 
 class Post(models.Model):
