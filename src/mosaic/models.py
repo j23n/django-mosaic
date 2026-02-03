@@ -5,6 +5,7 @@ import django.utils.timezone
 from django.utils.text import slugify
 from django.urls import reverse
 from django.db import models
+from django.contrib.auth.models import User
 
 
 class Namespace(models.Model):
@@ -17,7 +18,13 @@ class Namespace(models.Model):
         return f"<Namespace {self.name}"
 
 
+class Author(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    h_card = models.JSONField()
+
+
 class Post(models.Model):
+    author = models.ForeignKey(Author, on_delete=models.PROTECT)
     title = models.CharField(max_length=512, blank=False, null=False, unique=True)
     content = models.TextField()
     slug = models.SlugField(max_length=256, blank=True, null=False, unique=True)
