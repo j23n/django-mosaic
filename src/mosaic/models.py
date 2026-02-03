@@ -1,11 +1,19 @@
 import bleach
 import markdown
+import secrets
+from PIL import Image
+from io import BytesIO
+import os
+import logging
 
 import django.utils.timezone
 from django.utils.text import slugify
 from django.urls import reverse
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
+
+logger = logging.getLogger("mosaic")
 
 
 class Namespace(models.Model):
@@ -27,6 +35,64 @@ class Author(models.Model):
 
     def __repr__(self):
         return f"<Author {self.user.username}>"
+
+
+class ContentImage(models.Model):
+    image = models.ImageField(upload_to="content/images/")
+    thumb = models.ImageField(
+        upload_to="content/images/", blank=True, null=True, editable=False
+    )
+    caption = models.CharField(max_length=2048, null=False, blank=True, default="")
+    alt = models.CharField(max_length=2048, null=False, blank=True, default="")
+    post = models.ForeignKey("Post", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return "Image"
+
+    def __repr__(self):
+        return f"<Image {self.image} [{self.alt[:50]}]>"
+
+    def save(self, *args, **kwargs):
+        # Only generate thumbnail on creation
+        if not self.pk and self.image:
+            try:
+                # Generate random filename
+                ext = self.image.name.split(".")[-1]
+                random_name = secrets.token_hex(16)
+                new_filename = f"{random_name}.{ext}"
+
+                # Rename the image file
+                self.image.name = new_filename
+
+                # Generate thumbnail
+                img = Image.open(self.image.file)
+                img.thumbnail((600, 600), Image.Resampling.LANCZOS)
+
+                thumb_io = BytesIO()
+                img.save(thumb_io, format="PNG", quality=85)
+                thumb_io.seek(0)
+
+                # Save thumbnail with _thumb suffix
+                thumb_filename = f"{random_name}_thumb.{ext}"
+                self.thumb.save(
+                    thumb_filename, ContentFile(thumb_io.read()), save=False
+                )
+            except Exception as e:
+                logger.warning(f"Failed to create thumbnail: {e}")
+
+        super().save(*args, **kwargs)
+
+    def markdown(self):
+        if self.thumb:
+            thumb = self.thumb
+        else:
+            thumb = self.image
+
+        if self.caption:
+            return f"<figure><a href='{self.image.url}'><img src='{thumb.url}' alt='{self.alt}'></a><figcaption>{self.caption}</figcaption></figure>"
+        return (
+            f"<a href='{self.image.url}'><img src='{thumb.url}' alt='{self.alt}'></a>"
+        )
 
 
 class Post(models.Model):
@@ -52,7 +118,9 @@ class Post(models.Model):
         if not self.is_published and not self.slug:
             self.slug = slugify(self.title)
         if not self.summary:
-            self.summary = bleach.clean(markdown.markdown(self.content), strip=True, tags={})[:200]
+            self.summary = bleach.clean(
+                markdown.markdown(self.content), strip=True, tags={}
+            )[:200]
         if self.is_published and not self.published_at:
             self.published_at = django.utils.timezone.now()
         elif not self.is_published:
@@ -85,7 +153,7 @@ class Tag(models.Model):
         return reverse("tag-detail", args=[self.namespace.name, self.name])
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.namespace.name})"
 
     def __repr__(self):
         return f"<Tag {self.name} [{self.namespace.name}]>"

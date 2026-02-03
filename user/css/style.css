@@ -666,3 +666,11 @@ label {
   display:block;
   padding:0 0 0.2em 0
 }
+.gallery-3 {
+  display: grid;
+  grid: 1fr 1fr 1fr;
+}
+.gallery-2 {
+  display: grid;
+  grid: 1fr 1fr;
+}

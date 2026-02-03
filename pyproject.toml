@@ -26,6 +26,9 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+dependencies = [
+    "pillow>=12.1.0",
+]
 
 [project.urls]
 Homepage = "https://codeberg.org/j23n/django-magic-authorization"
