@@ -1,14 +1,17 @@
 {% extends "base.html" %}
 {% load markdownify %}
+
+{% block title %} - {{ post.title }}{% endblock %}
+
 {% block content %}
 <article class="h-entry">
 <hgroup>
 <h1 class="p-name">{{ post.title }}</h1>
 <small>
 Written on
-<time class="dt-published" datetime="{{ post.published_at|date:'Y-m-d H:M:S'">{{ post.published_at|date:'Y-m-d H:M:S' }}</time>
-by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author }}</a>
-{% if post.tags %}<br/>{% for t in post.tags.all %}<a href={{ t.get_absolute_url }}>{{ t.name }}</a> {% endfor %}{% endif %}
+<time class="dt-published" datetime="{{ post.published_at|date:'Y-m-d H:i:s' }}">{{ post.published_at|date:'Y-m-d' }}</time>
+by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.username }}</a>
+{% if post.tags %} in {% for t in post.tags.all %}<a href={{ t.get_absolute_url }}>{{ t.name }}</a> {% endfor %}{% endif %}
 </small>
 </hgroup>
 <div class="e-summary" hidden="true">

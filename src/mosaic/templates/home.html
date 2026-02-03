@@ -2,24 +2,8 @@
 {% load markdownify %}
 
 {% block content %}
-<h2>Latest</h2>
 
-<div>
-{% with posts.0 as latest_post %}
-<a href="{{ latest_post.get_absolute_url }}" class="plain">
-<h2>{{ latest_post.title }}</h2>
-<div class="small muted">{{ latest_post.published_at }}</div>
-<p>{{ latest_post.summary }} ...</p>
-</a>
-{% endwith %}
-</div>
-
-<hr/>
-
-<h2>Topics</h2>
-{% for t in tags %}
-<a href={{ t.get_absolute_url }}>{{ t.name }}</a>{% if not forloop.last %}, {% endif %}
-{% endfor %}
+{% include "includes/about.html" %}
 
 <hr/>
 
@@ -29,5 +13,12 @@
 {% include "post-detail-include.html" %}
 {% endfor %}
 </ul>
+
+<hr />
+
+<h2>Topics</h2>
+{% for t in tags %}
+<a href={{ t.get_absolute_url }}>{{ t.name }}</a>{% if not forloop.last %}, {% endif %}
+{% endfor %}
 
 {% endblock %}
