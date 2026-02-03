@@ -4,12 +4,12 @@ from mosaic.models import Post, Tag
 
 
 def _get_posts(namespace="public"):
-    return Post.objects.filter(namespace__name=namespace, is_published=False)
+    return Post.objects.filter(namespace__name=namespace, is_published=True)
 
 
 def home(request):
     posts = _get_posts()
-    tags = Tag.objects.filter(post__in=posts)
+    tags = Tag.objects.filter(post__in=posts).distinct()
 
     return render(
         request,
