@@ -2,7 +2,7 @@
 set -e
 
 BACKUP_DIR="{{INSTALL_PATH}}/backups"
-DB_FILE="{{INSTALL_PATH}}/db/db.sqlite3"
+DB_FILE="{{INSTALL_PATH}}/db.sqlite3"
 
 # Create backup directories
 mkdir -p "$BACKUP_DIR"/{hourly,daily,weekly,monthly}

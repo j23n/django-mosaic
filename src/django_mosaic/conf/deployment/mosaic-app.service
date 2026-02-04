@@ -19,7 +19,7 @@ ExecStart=/usr/bin/docker run \
     -p 127.0.0.1:8000:8000 \
     -v {{INSTALL_PATH}}/media:/app/media \
     -v {{INSTALL_PATH}}/static:/app/staticfiles \
-    -v {{INSTALL_PATH}}/db:/app/db \
+    -v {{INSTALL_PATH}}/db.sqlite3:/app/db.sqlite3 \
     {{APP_NAME}}:latest
 
 # Container cleanup on stop
