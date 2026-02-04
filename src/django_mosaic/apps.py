@@ -2,4 +2,4 @@ from django.apps import AppConfig
 
 
 class BlogConfig(AppConfig):
-    name = "mosaic"
+    name = "django_mosaic"

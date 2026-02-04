@@ -5,7 +5,7 @@ import logging
 
 from django.core.management.base import BaseCommand
 from django.utils.text import slugify
-from mosaic.models import Post, Tag, Namespace
+from django_mosaic.models import Post, Tag, Namespace
 
 EXPECTED_KEYWORDS = ["title", "date", "draft"]
 

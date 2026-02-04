@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.db import models
 from django import forms
 from django.utils.html import format_html
-from mosaic.models import Post, Tag, ContentImage
+from django_mosaic.models import Post, Tag, ContentImage
 
 
 class ContentImageInlineAdmin(admin.TabularInline):

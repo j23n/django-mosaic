@@ -13,7 +13,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 
-logger = logging.getLogger("mosaic")
+logger = logging.getLogger("django_mosaic")
 
 
 class Namespace(models.Model):

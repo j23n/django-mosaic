@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.conf import settings
-from mosaic.models import Post, Tag
+from django_mosaic.models import Post, Tag
 
 
 def _get_posts(namespace="public"):

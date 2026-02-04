@@ -3,8 +3,8 @@ from django_magic_authorization.urls import protected_path
 from django.conf import settings
 from django.conf.urls.static import static
 
-from mosaic.views import post_list, post_detail, home, about, tag_detail
-from mosaic.feeds import PostFeed
+from django_mosaic.views import post_list, post_detail, home, about, tag_detail
+from django_mosaic.feeds import PostFeed
 
 mosaic_patterns = [
     path("tag/<str:name>", tag_detail, name="tag-detail"),

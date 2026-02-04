@@ -18,7 +18,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django_magic_authorization",
-    "mosaic",
+    "django_mosaic",
 ]
 
 DATABASES = {

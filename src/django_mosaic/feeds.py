@@ -1,7 +1,7 @@
 from django.contrib.syndication.views import Feed
 from django.conf import settings
 
-from mosaic.models import Post, Namespace
+from django_mosaic.models import Post, Namespace
 
 
 class PostFeed(Feed):
