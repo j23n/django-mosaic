@@ -1,0 +1,11 @@
+[Unit]
+Description={{APP_NAME}} Database Backup
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory={{INSTALL_PATH}}
+ExecStart=/bin/bash {{INSTALL_PATH}}/backup.sh
+
+[Install]
+WantedBy=multi-user.target

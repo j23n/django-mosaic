@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly backup of {{APP_NAME}} database
+Requires=mosaic-backup.service
+
+[Timer]
+# Run every hour on the hour
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
