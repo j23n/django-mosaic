@@ -184,7 +184,7 @@ class Command(BaseCommand):
         config['ssh_key'] = self._get_input_required(
             'SSH private key path',
             default="~/.ssh/id_rsa",
-            validator=lambda x: Path(x.expanduser() if x.startswith('~') else x).exists(),
+            validator=lambda x: Path(x).expanduser().exists(),
             error_msg='SSH key file does not exist'
         )
 
@@ -498,11 +498,25 @@ class Command(BaseCommand):
 
         # Gather minimal config
         config = {}
-        config['host'] = options.get('host') or input('VPS hostname or IP: ')
-        config['user'] = options.get('user') or 'root'
+
+        # SSH connection details
+        config['host'] = self._get_input_required(
+            'VPS hostname or IP',
+            validator=lambda x: len(x.strip()) > 0,
+            error_msg='Host cannot be empty'
+        )
+
+        config['user'] = input('SSH user [root]: ') or 'root'
+
+        config['ssh_key'] = self._get_input_required(
+            'SSH private key path',
+            default="~/.ssh/id_rsa",
+            validator=lambda x: Path(x).expanduser().exists(),
+            error_msg='SSH key file does not exist'
+        )
 
         try:
-            conn = Connection(host=config['host'], user=config['user'])
+            conn = self.test_ssh_connection(config)
 
             # Check Docker
             self.stdout.write('\n🐳 Docker:')
@@ -532,6 +546,7 @@ class Command(BaseCommand):
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'Failed to check status: {e}'))
+
 
     def check_docker_status(self, conn):
         """Check if Docker is running and show container status"""
