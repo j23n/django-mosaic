@@ -1,9 +1,11 @@
 """
-Django management command to deploy mosaic to a VPS.
+Deployment handler for mosaic blog.
 
-Usage:
-    python manage.py deployment setup
-    python manage.py deployment status
+This module is called via the mosaic command:
+    python manage.py mosaic deployment setup
+    python manage.py mosaic deployment status
+
+Not meant to be called directly.
 """
 
 from django.core.management.base import BaseCommand
@@ -21,20 +23,6 @@ from .config_manager import ConfigManager
 
 class Command(BaseCommand):
     help = 'Deploy mosaic blog to a VPS'
-
-    def add_arguments(self, parser):
-        subparsers = parser.add_subparsers(dest='subcommand', required=True)
-
-        # Setup subcommand
-        setup = subparsers.add_parser('setup', help='Deploy the blog to VPS')
-        setup.add_argument('--host', help='VPS hostname or IP')
-        setup.add_argument('--user', default='root', help='SSH user (default: root)')
-        setup.add_argument('--domain', help='Domain name for the blog')
-
-        # Status subcommand
-        status = subparsers.add_parser('status', help='Check deployment status')
-        status.add_argument('--host', help='VPS hostname or IP')
-        status.add_argument('--user', default='root', help='SSH user')
 
     def handle(self, *args, **options):
         if options['subcommand'] == 'setup':
