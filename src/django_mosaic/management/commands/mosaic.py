@@ -26,6 +26,8 @@ class Command(BaseCommand):
         setup.add_argument('--host', help='VPS hostname or IP')
         setup.add_argument('--user', default='root', help='SSH user (default: root)')
         setup.add_argument('--domain', help='Domain name for the blog')
+        setup.add_argument('--auto', action='store_true', help='Run without confirmations (print commands only)')
+        setup.add_argument('--explain', action='store_true', help='Show descriptions for each operation')
 
         # Deployment: status
         status = deployment_subparsers.add_parser('status', help='Check deployment status')

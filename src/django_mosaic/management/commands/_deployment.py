@@ -62,6 +62,68 @@ class Command(BaseCommand):
             result = result.replace(placeholder, value)
         return result
 
+    def _run(self, conn, cmd, description=None, **kwargs):
+        """Execute conn.run() with display and confirmation"""
+        if description and self.explain_mode:
+            self.stdout.write(f"\n{description}")
+        self.stdout.write(f"  $ {cmd}")
+
+        if not self.auto_mode:
+            response = input("  Execute? [Y/n]: ").strip()
+            if response.lower() == 'n':
+                raise Exception("Deployment cancelled by user")
+
+        return conn.run(cmd, **kwargs)
+
+    def _sudo(self, conn, cmd, description=None, **kwargs):
+        """Execute conn.sudo() with display and confirmation"""
+        if description and self.explain_mode:
+            self.stdout.write(f"\n{description}")
+        self.stdout.write(self.style.WARNING(f"  $ sudo {cmd}"))
+
+        if not self.auto_mode:
+            response = input("  Execute? [Y/n]: ").strip()
+            if response.lower() == 'n':
+                raise Exception("Deployment cancelled by user")
+
+        return conn.sudo(cmd, **kwargs)
+
+    def _put(self, conn, local_path, remote_path, description=None):
+        """Upload file with content display and confirmation"""
+        if description and self.explain_mode:
+            self.stdout.write(f"\n{description}")
+
+        local_file = Path(local_path)
+        file_size = local_file.stat().st_size if local_file.exists() else 0
+
+        self.stdout.write(f"  📤 {local_path} → {remote_path}")
+
+        # Show content for non-archive files
+        if not remote_path.endswith(('.tar.gz', '.tar', '.zip', '.tgz')):
+            try:
+                with open(local_path, 'r') as f:
+                    content = f.read()
+
+                self.stdout.write(self.style.SUCCESS("\n  Content:"))
+                self.stdout.write("  " + "─" * 70)
+                for i, line in enumerate(content.split('\n'), 1):
+                    self.stdout.write(f"  {i:3d} | {line}")
+                self.stdout.write("  " + "─" * 70)
+            except (UnicodeDecodeError, IsADirectoryError):
+                # Binary file
+                self.stdout.write(f"  (Binary file, {file_size} bytes)")
+        else:
+            # Archive - just show size
+            size_mb = file_size / (1024 * 1024)
+            self.stdout.write(f"  (Archive, {size_mb:.1f} MB)")
+
+        if not self.auto_mode:
+            response = input("  Upload? [Y/n]: ").strip()
+            if response.lower() == 'n':
+                raise Exception("Deployment cancelled by user")
+
+        return conn.put(local_path, remote_path)
+
     # =========================================================================
     # SETUP COMMAND
     # =========================================================================
@@ -70,17 +132,16 @@ class Command(BaseCommand):
         """Main setup flow - interactive deployment"""
         self.stdout.write(self.style.SUCCESS('=== Mosaic Deployment Helper ===\n'))
 
+        # Set auto mode flag
+        self.auto_mode = options.get('auto', False)
+        self.explain_mode = options.get('explain', False)
+
         conn = None
         config_manager = ConfigManager()
 
         try:
             # Step 1: Gather configuration
-            cli_args = {
-                'host': options.get('host'),
-                'user': options.get('user'),
-                'domain': options.get('domain'),
-            }
-            config = config_manager.get_config(cli_args=cli_args, stdout=self.stdout)
+            config = config_manager.get_config(stdout=self.stdout)
 
             # Generate secret key (not saved to file)
             config['secret_key'] = get_random_secret_key()
@@ -190,18 +251,13 @@ class Command(BaseCommand):
 
     def install_system_dependencies(self, conn, config):
         """Install Docker, nginx, certbot on the VPS"""
-        commands = [
-            'apt-get update',
-            'apt-get install -y docker.io nginx certbot python3-certbot-nginx',
-            'systemctl enable docker',
-            'systemctl start docker',
-        ]
+        self._sudo(conn, 'apt-get update', description='Updating package lists')
+        self._sudo(conn, 'apt-get install -y docker.io nginx certbot python3-certbot-nginx',
+                   description='Installing Docker, nginx, and certbot')
+        self._sudo(conn, 'systemctl enable docker', description='Enabling Docker service')
+        self._sudo(conn, 'systemctl start docker', description='Starting Docker service')
 
-        for cmd in commands:
-            self.stdout.write(f'  Running: {cmd}')
-            conn.sudo(cmd, hide=True)
-
-        self.stdout.write(self.style.SUCCESS('  ✓ Dependencies installed'))
+        self.stdout.write(self.style.SUCCESS('\n  ✓ Dependencies installed'))
 
     def transfer_project_files(self, conn, config):
         """Transfer project files to VPS"""
@@ -209,7 +265,7 @@ class Command(BaseCommand):
         build_path = f"{install_path}/build"
 
         # Create build directory on VPS
-        conn.run(f'mkdir -p {build_path}')
+        self._run(conn, f'mkdir -p {build_path}', description='Creating build directory on VPS')
 
         # Create temporary directory for files to transfer
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -227,8 +283,10 @@ class Command(BaseCommand):
                 f.write(entrypoint_content)
 
             # Transfer Dockerfile and entrypoint
-            conn.put(str(tmpdir / 'Dockerfile'), f'{build_path}/Dockerfile')
-            conn.put(str(tmpdir / 'docker-entrypoint.sh'), f'{build_path}/docker-entrypoint.sh')
+            self._put(conn, str(tmpdir / 'Dockerfile'), f'{build_path}/Dockerfile',
+                      description='Uploading Dockerfile')
+            self._put(conn, str(tmpdir / 'docker-entrypoint.sh'), f'{build_path}/docker-entrypoint.sh',
+                      description='Uploading Docker entrypoint script')
 
         # Create tar of current project (excluding venv, cache, etc.)
         project_root = Path.cwd()
@@ -250,14 +308,13 @@ class Command(BaseCommand):
         ], cwd=project_root, check=True)
 
         # Transfer project archive
-        self.stdout.write('  Uploading project files...')
         remote_tar = f'/tmp/{config["app_name"]}-project.tar.gz'
-        conn.put(tar_file, remote_tar)
+        self._put(conn, tar_file, remote_tar, description='Uploading project archive')
 
         # Extract on VPS
-        self.stdout.write('  Extracting project files...')
-        conn.run(f'tar xzf {remote_tar} -C {build_path}')
-        conn.run(f'rm {remote_tar}')
+        self._run(conn, f'tar xzf {remote_tar} -C {build_path}',
+                  description='Extracting project files on VPS')
+        self._run(conn, f'rm {remote_tar}', description='Cleaning up remote tar file')
 
         # Cleanup local tar
         os.unlink(tar_file)
@@ -268,33 +325,33 @@ class Command(BaseCommand):
         """Build Docker image on the VPS"""
         build_path = f"{config['install_path']}/build"
 
-        self.stdout.write('  Building Docker image (this may take a few minutes)...')
-
         # Build the image
-        result = conn.run(
+        result = self._run(
+            conn,
             f'cd {build_path} && docker build -t {config["app_name"]}:latest .',
-            warn=True,
-            hide=True
+            description='Building Docker image on VPS (this may take a few minutes)',
+            warn=True
         )
 
         if not result.ok:
-            self.stdout.write(self.style.ERROR('  ✗ Docker build failed'))
+            self.stdout.write(self.style.ERROR('\n  ✗ Docker build failed'))
             raise Exception('Docker build failed')
 
-        self.stdout.write(self.style.SUCCESS('  ✓ Docker image built on VPS'))
+        self.stdout.write(self.style.SUCCESS('\n  ✓ Docker image built on VPS'))
 
     def setup_configuration(self, conn, config):
         """Generate and upload .env and settings.py"""
         install_path = config['install_path']
 
         # Create installation directory
-        conn.run(f'mkdir -p {install_path}')
-        conn.run(f'mkdir -p {install_path}/db')
-        conn.run(f'mkdir -p {install_path}/media')
-        conn.run(f'mkdir -p {install_path}/static')
+        self._run(conn, f'mkdir -p {install_path}', description='Creating installation directory')
+        self._run(conn, f'mkdir -p {install_path}/db', description='Creating database directory')
+        self._run(conn, f'mkdir -p {install_path}/media', description='Creating media directory')
+        self._run(conn, f'mkdir -p {install_path}/static', description='Creating static files directory')
 
         # Check if .env already exists and reuse SECRET_KEY if it does
-        result = conn.run(f'cat {install_path}/.env 2>/dev/null | grep "^SECRET_KEY="', warn=True, hide=True)
+        result = self._run(conn, f'cat {install_path}/.env 2>/dev/null | grep "^SECRET_KEY="',
+                          description='Checking for existing SECRET_KEY', warn=True, hide=True)
         if result.ok and result.stdout.strip():
             # Extract and reuse existing secret key
             existing_key = result.stdout.strip().split('=', 1)[1].strip().strip('"').strip("'")
@@ -310,7 +367,7 @@ class Command(BaseCommand):
             f.write(env_content)
             env_temp = f.name
 
-        conn.put(env_temp, f'{install_path}/.env')
+        self._put(conn, env_temp, f'{install_path}/.env', description='Uploading .env configuration')
         os.unlink(env_temp)
 
         # Upload backup script
@@ -321,8 +378,8 @@ class Command(BaseCommand):
             f.write(backup_content)
             backup_temp = f.name
 
-        conn.put(backup_temp, f'{install_path}/backup.sh')
-        conn.run(f'chmod +x {install_path}/backup.sh')
+        self._put(conn, backup_temp, f'{install_path}/backup.sh', description='Uploading backup script')
+        self._run(conn, f'chmod +x {install_path}/backup.sh', description='Making backup script executable')
         os.unlink(backup_temp)
 
         self.stdout.write(self.style.SUCCESS('  ✓ Configuration files uploaded'))
@@ -343,12 +400,14 @@ class Command(BaseCommand):
                 f.write(content)
                 temp_file = f.name
 
-            conn.put(temp_file, f'/tmp/{service_name}')
-            conn.sudo(f'mv /tmp/{service_name} /etc/systemd/system/{service_name}')
+            self._put(conn, temp_file, f'/tmp/{service_name}',
+                     description=f'Uploading {service_name}')
+            self._sudo(conn, f'mv /tmp/{service_name} /etc/systemd/system/{service_name}',
+                      description=f'Installing {service_name}')
             os.unlink(temp_file)
 
-        conn.sudo('systemctl daemon-reload')
-        self.stdout.write(self.style.SUCCESS('  ✓ Systemd services created'))
+        self._sudo(conn, 'systemctl daemon-reload', description='Reloading systemd daemon')
+        self.stdout.write(self.style.SUCCESS('\n  ✓ Systemd services created'))
 
     def setup_nginx(self, conn, config):
         """Configure nginx as reverse proxy"""
@@ -361,19 +420,21 @@ class Command(BaseCommand):
             f.write(nginx_content)
             temp_file = f.name
 
-        conn.put(temp_file, f'/tmp/{site_name}')
-        conn.sudo(f'mv /tmp/{site_name} /etc/nginx/sites-available/{site_name}')
-        conn.sudo(f'ln -sf /etc/nginx/sites-available/{site_name} /etc/nginx/sites-enabled/{site_name}')
+        self._put(conn, temp_file, f'/tmp/{site_name}', description='Uploading nginx configuration')
+        self._sudo(conn, f'mv /tmp/{site_name} /etc/nginx/sites-available/{site_name}',
+                  description='Installing nginx site configuration')
+        self._sudo(conn, f'ln -sf /etc/nginx/sites-available/{site_name} /etc/nginx/sites-enabled/{site_name}',
+                  description='Enabling nginx site')
         os.unlink(temp_file)
 
         # Test nginx config
-        result = conn.sudo('nginx -t', warn=True, hide=True)
+        result = self._sudo(conn, 'nginx -t', description='Testing nginx configuration', warn=True, hide=True)
         if not result.ok:
-            self.stdout.write(self.style.ERROR('  ✗ Nginx configuration test failed'))
+            self.stdout.write(self.style.ERROR('\n  ✗ Nginx configuration test failed'))
             raise Exception('Nginx configuration is invalid')
 
         # Reload nginx to apply changes
-        conn.sudo('systemctl reload nginx')
+        self._sudo(conn, 'systemctl reload nginx', description='Reloading nginx')
 
         self.stdout.write(self.style.SUCCESS('  ✓ Nginx configured and reloaded'))
 
@@ -392,26 +453,26 @@ class Command(BaseCommand):
             f'--expand'  # Allow expanding certificate with additional domains
         )
 
-        result = conn.sudo(cmd, warn=True)
+        result = self._sudo(conn, cmd, description='Obtaining SSL certificate with certbot', warn=True)
         if result.ok:
-            self.stdout.write(self.style.SUCCESS('  ✓ SSL certificate obtained'))
+            self.stdout.write(self.style.SUCCESS('\n  ✓ SSL certificate obtained'))
         else:
-            self.stdout.write(self.style.WARNING('  ⚠ SSL setup failed (you may need to configure DNS first)'))
+            self.stdout.write(self.style.WARNING('\n  ⚠ SSL setup failed (you may need to configure DNS first)'))
 
     def start_services(self, conn, config):
         """Start all services"""
         # Enable and restart app service (restart ensures config changes are applied)
-        conn.sudo('systemctl enable mosaic-app.service')
-        conn.sudo('systemctl restart mosaic-app.service')
+        self._sudo(conn, 'systemctl enable mosaic-app.service', description='Enabling mosaic app service')
+        self._sudo(conn, 'systemctl restart mosaic-app.service', description='Starting mosaic app service')
 
         # Enable and restart backup timer
-        conn.sudo('systemctl enable mosaic-backup.timer')
-        conn.sudo('systemctl restart mosaic-backup.timer')
+        self._sudo(conn, 'systemctl enable mosaic-backup.timer', description='Enabling backup timer')
+        self._sudo(conn, 'systemctl restart mosaic-backup.timer', description='Starting backup timer')
 
         # Reload nginx
-        conn.sudo('systemctl reload nginx')
+        self._sudo(conn, 'systemctl reload nginx', description='Reloading nginx')
 
-        self.stdout.write(self.style.SUCCESS('  ✓ Services started'))
+        self.stdout.write(self.style.SUCCESS('\n  ✓ Services started'))
 
     # =========================================================================
     # STATUS COMMAND
@@ -423,15 +484,10 @@ class Command(BaseCommand):
 
         # Load config using ConfigManager
         config_manager = ConfigManager()
-        cli_args = {
-            'host': options.get('host'),
-            'user': options.get('user'),
-        }
-
+        
         # For status, we need fewer fields than setup
         required_fields = ['host', 'user', 'ssh_key', 'install_path', 'app_name', 'domain']
         config = config_manager.get_config(
-            cli_args=cli_args,
             required_fields=required_fields,
             stdout=self.stdout
         )
@@ -460,9 +516,8 @@ class Command(BaseCommand):
             self.check_ssl_status(conn, config)
 
             # Check application health
-            if config.get('domain'):
-                self.stdout.write('\n🏥 Application Health:')
-                self.check_application_health(conn, config)
+            self.stdout.write('\n🏥 Application Health:')
+            self.check_application_health(conn, config)
 
             # Check disk space
             self.stdout.write('\n💾 Disk Space:')
