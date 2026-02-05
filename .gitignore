@@ -12,3 +12,6 @@ wheels/
 # Content
 db.sqlite3
 static/content
+
+# Deployment config (contains sensitive info)
+.deployment-config.toml

@@ -16,6 +16,8 @@ import os
 import secrets
 from pathlib import Path
 
+from .config_manager import ConfigManager
+
 
 class Command(BaseCommand):
     help = 'Deploy mosaic blog to a VPS'
@@ -81,10 +83,19 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('=== Mosaic Deployment Helper ===\n'))
 
         conn = None
+        config_manager = ConfigManager()
 
         try:
             # Step 1: Gather configuration
-            config = self.gather_config(options)
+            cli_args = {
+                'host': options.get('host'),
+                'user': options.get('user'),
+                'domain': options.get('domain'),
+            }
+            config = config_manager.get_config(cli_args=cli_args, stdout=self.stdout)
+
+            # Generate secret key (not saved to file)
+            config['secret_key'] = get_random_secret_key()
 
             # Step 2: Test SSH connection
             self.stdout.write('\n📡 Testing SSH connection...')
@@ -160,6 +171,10 @@ class Command(BaseCommand):
 
             self.stdout.write(self.style.SUCCESS(f'\n✅ Deployment complete! Visit https://{config["domain"]}'))
 
+            # Save configuration for future use
+            self.stdout.write('\n💾 Saving configuration...')
+            config_manager.save_to_file(config)
+
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING('\n\n⚠ Deployment cancelled by user'))
         except Exception as e:
@@ -167,98 +182,6 @@ class Command(BaseCommand):
         finally:
             if conn:
                 conn.close()
-
-    def gather_config(self, options):
-        """Interactive prompts to gather deployment configuration"""
-        config = {}
-
-        # SSH connection details
-        config['host'] = self._get_input_required(
-            'VPS hostname or IP',
-            validator=lambda x: len(x.strip()) > 0,
-            error_msg='Host cannot be empty'
-        )
-
-        config['user'] = input('SSH user [root]: ') or 'root'
-
-        config['ssh_key'] = self._get_input_required(
-            'SSH private key path',
-            default="~/.ssh/id_rsa",
-            validator=lambda x: Path(x).expanduser().exists(),
-            error_msg='SSH key file does not exist'
-        )
-
-        # Site details
-        config['domain'] = self._get_input_required(
-            'Domain name (e.g., blog.example.com)',
-            validator=lambda x: '.' in x and ' ' not in x,
-            error_msg='Invalid domain format'
-        )
-
-        config['install_path'] = input('Installation path [/var/www/mosaic]: ') or '/var/www/mosaic'
-
-        # Email for Let's Encrypt
-        config['email'] = self._get_input_required(
-            'Email for SSL certificate notifications',
-            validator=lambda x: '@' in x and '.' in x.split('@')[1],
-            error_msg='Invalid email format'
-        )
-
-        # App configuration
-        config['app_name'] = input('Application name [mosaic]: ') or 'mosaic'
-
-        config['gunicorn_workers'] = self._get_input_required(
-            'Number of Gunicorn workers',
-            default='2',
-            validator=lambda x: x.isdigit() and int(x) > 0,
-            error_msg='Must be a positive integer'
-        )
-
-        # Django project configuration
-        config['wsgi_module'] = self._get_input_required(
-            'WSGI module',
-            default="website.wsgi:application",
-            validator=lambda x: ':' in x and all(part.strip() for part in x.split(':')),
-            error_msg='Must be in format "module.path:application"'
-        )
-
-        config['url_conf'] = self._get_input_required(
-            'URL configuration module',
-            default="website.urls",
-            validator=lambda x: len(x.strip()) > 0 and ' ' not in x,
-            error_msg='Must be a valid Python module path'
-        )
-
-        # Generate secret key
-        config['secret_key'] = get_random_secret_key()
-
-        return config
-
-    def _get_input_required(self, prompt, default=None, validator=None, error_msg='Invalid input'):
-        """Get input with validation, retry on invalid input"""
-        prompt_text = f'{prompt}: ' if not default else f'{prompt} [{default}]: '
-
-        while True:
-            user_input = input(prompt_text).strip()
-
-            # Use default if provided and input is empty
-            if not user_input and default:
-                user_input = default
-
-            # Validate
-            if validator:
-                try:
-                    if validator(user_input):
-                        return user_input
-                    else:
-                        self.stdout.write(self.style.ERROR(f'  ✗ {error_msg}. Please try again.'))
-                except Exception:
-                    self.stdout.write(self.style.ERROR(f'  ✗ {error_msg}. Please try again.'))
-            else:
-                if user_input:
-                    return user_input
-                else:
-                    self.stdout.write(self.style.ERROR('  ✗ This field is required. Please try again.'))
 
     def test_ssh_connection(self, config):
         """Test SSH connection and return Connection object"""
@@ -510,29 +433,20 @@ class Command(BaseCommand):
         """Check deployment status on VPS"""
         self.stdout.write(self.style.SUCCESS('=== Deployment Status ===\n'))
 
-        # Gather minimal config
-        config = {}
+        # Load config using ConfigManager
+        config_manager = ConfigManager()
+        cli_args = {
+            'host': options.get('host'),
+            'user': options.get('user'),
+        }
 
-        # SSH connection details
-        config['host'] = self._get_input_required(
-            'VPS hostname or IP',
-            validator=lambda x: len(x.strip()) > 0,
-            error_msg='Host cannot be empty'
+        # For status, we need fewer fields than setup
+        required_fields = ['host', 'user', 'ssh_key', 'install_path', 'app_name', 'domain']
+        config = config_manager.get_config(
+            cli_args=cli_args,
+            required_fields=required_fields,
+            stdout=self.stdout
         )
-
-        config['user'] = input('SSH user [root]: ') or 'root'
-
-        config['ssh_key'] = self._get_input_required(
-            'SSH private key path',
-            default="~/.ssh/id_rsa",
-            validator=lambda x: Path(x).expanduser().exists(),
-            error_msg='SSH key file does not exist'
-        )
-
-        # Get deployment details for accurate checks
-        config['install_path'] = input('Installation path [/var/www/mosaic]: ') or '/var/www/mosaic'
-        config['app_name'] = input('Application name [mosaic]: ') or 'mosaic'
-        config['domain'] = input('Domain name (optional, for health check): ').strip() or None
 
         try:
             conn = self.test_ssh_connection(config)
