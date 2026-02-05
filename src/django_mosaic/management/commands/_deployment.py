@@ -73,6 +73,9 @@ class Command(BaseCommand):
             if response.lower() == 'n':
                 raise Exception("Deployment cancelled by user")
 
+        if self.dry_run:
+            return None
+
         return conn.run(cmd, **kwargs)
 
     def _sudo(self, conn, cmd, description=None, **kwargs):
@@ -85,6 +88,9 @@ class Command(BaseCommand):
             response = input("  Execute? [Y/n]: ").strip()
             if response.lower() == 'n':
                 raise Exception("Deployment cancelled by user")
+
+        if self.dry_run:
+            return None
 
         return conn.sudo(cmd, **kwargs)
 
@@ -122,6 +128,9 @@ class Command(BaseCommand):
             if response.lower() == 'n':
                 raise Exception("Deployment cancelled by user")
 
+        if self.dry_run:
+            return None
+
         return conn.put(local_path, remote_path)
 
     # =========================================================================
@@ -132,9 +141,13 @@ class Command(BaseCommand):
         """Main setup flow - interactive deployment"""
         self.stdout.write(self.style.SUCCESS('=== Mosaic Deployment Helper ===\n'))
 
-        # Set auto mode flag
+        # Set mode flags
         self.auto_mode = options.get('auto', False)
         self.explain_mode = options.get('explain', False)
+        self.dry_run = options.get('dry_run', False)
+
+        if self.dry_run:
+            self.stdout.write(self.style.WARNING('🔍 Dry run mode: no commands will be executed\n'))
 
         conn = None
         config_manager = ConfigManager()
@@ -333,7 +346,7 @@ class Command(BaseCommand):
             warn=True
         )
 
-        if not result.ok:
+        if not self.dry_run and not result.ok:
             self.stdout.write(self.style.ERROR('\n  ✗ Docker build failed'))
             raise Exception('Docker build failed')
 
@@ -352,7 +365,7 @@ class Command(BaseCommand):
         # Check if .env already exists and reuse SECRET_KEY if it does
         result = self._run(conn, f'cat {install_path}/.env 2>/dev/null | grep "^SECRET_KEY="',
                           description='Checking for existing SECRET_KEY', warn=True, hide=True)
-        if result.ok and result.stdout.strip():
+        if not self.dry_run and result.ok and result.stdout.strip():
             # Extract and reuse existing secret key
             existing_key = result.stdout.strip().split('=', 1)[1].strip().strip('"').strip("'")
             if existing_key:
@@ -429,7 +442,7 @@ class Command(BaseCommand):
 
         # Test nginx config
         result = self._sudo(conn, 'nginx -t', description='Testing nginx configuration', warn=True, hide=True)
-        if not result.ok:
+        if not self.dry_run and not result.ok:
             self.stdout.write(self.style.ERROR('\n  ✗ Nginx configuration test failed'))
             raise Exception('Nginx configuration is invalid')
 
@@ -454,10 +467,11 @@ class Command(BaseCommand):
         )
 
         result = self._sudo(conn, cmd, description='Obtaining SSL certificate with certbot', warn=True)
-        if result.ok:
-            self.stdout.write(self.style.SUCCESS('\n  ✓ SSL certificate obtained'))
-        else:
-            self.stdout.write(self.style.WARNING('\n  ⚠ SSL setup failed (you may need to configure DNS first)'))
+        if not self.dry_run:
+            if result.ok:
+                self.stdout.write(self.style.SUCCESS('\n  ✓ SSL certificate obtained'))
+            else:
+                self.stdout.write(self.style.WARNING('\n  ⚠ SSL setup failed (you may need to configure DNS first)'))
 
     def start_services(self, conn, config):
         """Start all services"""
