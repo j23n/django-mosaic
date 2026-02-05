@@ -529,12 +529,21 @@ class Command(BaseCommand):
             error_msg='SSH key file does not exist'
         )
 
+        # Get deployment details for accurate checks
+        config['install_path'] = input('Installation path [/var/www/mosaic]: ') or '/var/www/mosaic'
+        config['app_name'] = input('Application name [mosaic]: ') or 'mosaic'
+        config['domain'] = input('Domain name (optional, for health check): ').strip() or None
+
         try:
             conn = self.test_ssh_connection(config)
 
+            # Check configuration files
+            self.stdout.write('\n📄 Configuration Files:')
+            self.check_config_files(conn, config)
+
             # Check Docker
             self.stdout.write('\n🐳 Docker:')
-            self.check_docker_status(conn)
+            self.check_docker_status(conn, config)
 
             # Check systemd services
             self.stdout.write('\n⚙️  Services:')
@@ -546,7 +555,12 @@ class Command(BaseCommand):
 
             # Check SSL certificate
             self.stdout.write('\n🔒 SSL Certificate:')
-            self.check_ssl_status(conn)
+            self.check_ssl_status(conn, config)
+
+            # Check application health
+            if config.get('domain'):
+                self.stdout.write('\n🏥 Application Health:')
+                self.check_application_health(conn, config)
 
             # Check disk space
             self.stdout.write('\n💾 Disk Space:')
@@ -554,7 +568,11 @@ class Command(BaseCommand):
 
             # Check last backup
             self.stdout.write('\n📦 Database Backup:')
-            self.check_backup_status(conn)
+            self.check_backup_status(conn, config)
+
+            # Check for recent errors
+            self.stdout.write('\n⚠️  Recent Errors:')
+            self.check_recent_errors(conn, config)
 
             conn.close()
 
@@ -562,17 +580,71 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'Failed to check status: {e}'))
 
 
-    def check_docker_status(self, conn):
+    def check_config_files(self, conn, config):
+        """Check if critical configuration files exist"""
+        install_path = config.get('install_path', '/var/www/mosaic')
+        app_name = config.get('app_name', 'mosaic')
+
+        files_to_check = [
+            (f'{install_path}/.env', '.env file'),
+            (f'{install_path}/backup.sh', 'backup.sh script'),
+            (f'/etc/systemd/system/mosaic-app.service', 'mosaic-app.service'),
+            (f'/etc/systemd/system/mosaic-backup.service', 'mosaic-backup.service'),
+            (f'/etc/systemd/system/mosaic-backup.timer', 'mosaic-backup.timer'),
+            (f'/etc/nginx/sites-available/{app_name}', 'nginx site config'),
+            (f'/etc/nginx/sites-enabled/{app_name}', 'nginx site symlink'),
+        ]
+
+        for file_path, description in files_to_check:
+            result = conn.run(f'test -e {file_path}', warn=True, hide=True)
+            if result.ok:
+                # Check if backup.sh is executable
+                if 'backup.sh' in file_path:
+                    exec_result = conn.run(f'test -x {file_path}', warn=True, hide=True)
+                    if exec_result.ok:
+                        self.stdout.write(self.style.SUCCESS(f'  ✓ {description} exists and is executable'))
+                    else:
+                        self.stdout.write(self.style.WARNING(f'  ⚠ {description} exists but is not executable'))
+                else:
+                    self.stdout.write(self.style.SUCCESS(f'  ✓ {description} exists'))
+            else:
+                self.stdout.write(self.style.ERROR(f'  ✗ {description} missing'))
+
+    def check_docker_status(self, conn, config):
         """Check if Docker is running and show container status"""
-        result = conn.run('docker ps --filter name=mosaic', warn=True, hide=True)
+        app_name = config.get('app_name', 'mosaic')
+
+        # Check if container is running
+        result = conn.run(f'docker ps --filter "name={app_name}" --format "{{{{.Names}}}}|{{{{.Status}}}}|{{{{.Image}}}}"', warn=True, hide=True)
         if result.ok and result.stdout.strip():
-            self.stdout.write(self.style.SUCCESS('  ✓ Container running'))
+            container_info = result.stdout.strip().split('|')
+            if len(container_info) >= 3:
+                name, status, image = container_info[0], container_info[1], container_info[2]
+                self.stdout.write(self.style.SUCCESS(f'  ✓ Container running: {name}'))
+                self.stdout.write(f'    Status: {status}')
+                self.stdout.write(f'    Image: {image}')
+            else:
+                self.stdout.write(self.style.SUCCESS('  ✓ Container running'))
         else:
             self.stdout.write(self.style.ERROR('  ✗ Container not running'))
 
+            # Check if container exists but is stopped
+            stopped = conn.run(f'docker ps -a --filter "name={app_name}" --format "{{{{.Names}}}}"', warn=True, hide=True)
+            if stopped.ok and stopped.stdout.strip():
+                self.stdout.write(self.style.WARNING(f'    ⚠ Container exists but is stopped'))
+
+        # Check if image exists
+        image_result = conn.run(f'docker images {app_name}:latest --format "{{{{.ID}}}}|{{{{.CreatedAt}}}}"', warn=True, hide=True)
+        if image_result.ok and image_result.stdout.strip():
+            image_info = image_result.stdout.strip().split('|')
+            if len(image_info) >= 2:
+                self.stdout.write(f'  Image: {app_name}:latest (created {image_info[1]})')
+        else:
+            self.stdout.write(self.style.WARNING(f'  ⚠ Image {app_name}:latest not found'))
+
     def check_services_status(self, conn):
         """Check systemd service status"""
-        services = ['mosaic-app.service', 'mosaic-backup.timer']
+        services = ['mosaic-app.service', 'mosaic-backup.service', 'mosaic-backup.timer']
         for service in services:
             result = conn.run(f'systemctl is-active {service}', warn=True, hide=True)
             if result.ok and 'active' in result.stdout:
@@ -588,7 +660,32 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.ERROR('  ✗ Nginx inactive'))
 
-    def check_ssl_status(self, conn):
+    def check_application_health(self, conn, config):
+        """Check if application is responding to HTTP requests"""
+        domain = config.get('domain')
+        if not domain:
+            self.stdout.write(self.style.WARNING('  ⚠ No domain configured, skipping health check'))
+            return
+
+        # Try HTTPS first, then HTTP
+        for protocol in ['https', 'http']:
+            result = conn.run(
+                f'curl -s -o /dev/null -w "%{{http_code}}" --max-time 5 {protocol}://{domain}/',
+                warn=True,
+                hide=True
+            )
+            if result.ok:
+                status_code = result.stdout.strip()
+                if status_code.startswith('2') or status_code.startswith('3'):
+                    self.stdout.write(self.style.SUCCESS(f'  ✓ Application responding ({protocol.upper()} {status_code})'))
+                    return
+                else:
+                    self.stdout.write(self.style.WARNING(f'  ⚠ Application returned {protocol.upper()} {status_code}'))
+                    return
+
+        self.stdout.write(self.style.ERROR(f'  ✗ Application not responding at {domain}'))
+
+    def check_ssl_status(self, conn, config):
         """Check SSL certificate status"""
         result = conn.run('certbot certificates', warn=True, hide=True)
         if result.ok and 'VALID' in result.stdout:
@@ -603,18 +700,63 @@ class Command(BaseCommand):
         if len(lines) >= 2:
             self.stdout.write(f'  {lines[1]}')
 
-    def check_backup_status(self, conn):
+    def check_backup_status(self, conn, config):
         """Check last backup time"""
-        result = conn.run('ls -t /var/www/mosaic/backups/hourly/db-*.sqlite3 2>/dev/null | head -1', warn=True, hide=True)
+        install_path = config.get('install_path', '/var/www/mosaic')
+        result = conn.run(f'ls -t {install_path}/backups/hourly/db-*.sqlite3 2>/dev/null | head -1', warn=True, hide=True)
         if result.ok and result.stdout.strip():
             latest = result.stdout.strip().split('/')[-1]
             self.stdout.write(self.style.SUCCESS(f'  ✓ Latest backup: {latest}'))
 
             # Count backups
             for tier in ['hourly', 'daily', 'weekly', 'monthly']:
-                count_result = conn.run(f'ls -1 /var/www/mosaic/backups/{tier}/db-*.sqlite3 2>/dev/null | wc -l', warn=True, hide=True)
+                count_result = conn.run(f'ls -1 {install_path}/backups/{tier}/db-*.sqlite3 2>/dev/null | wc -l', warn=True, hide=True)
                 if count_result.ok:
                     count = count_result.stdout.strip()
                     self.stdout.write(f'    {tier.capitalize()}: {count} backups')
         else:
             self.stdout.write(self.style.WARNING('  ⚠ No backups found'))
+
+    def check_recent_errors(self, conn, config):
+        """Check for recent errors in logs"""
+        app_name = config.get('app_name', 'mosaic')
+        has_errors = False
+
+        # Check Docker container logs for errors
+        docker_result = conn.run(
+            f'docker logs {app_name} --tail 50 2>&1 | grep -iE "(error|exception|fatal|critical)" | head -5',
+            warn=True,
+            hide=True
+        )
+        if docker_result.ok and docker_result.stdout.strip():
+            self.stdout.write(self.style.WARNING('  ⚠ Recent errors in Docker logs:'))
+            for line in docker_result.stdout.strip().split('\n')[:3]:
+                self.stdout.write(f'    {line[:100]}')
+            has_errors = True
+
+        # Check systemd service failures
+        systemd_result = conn.run(
+            'journalctl -u mosaic-app.service --since "1 hour ago" --no-pager -p err 2>/dev/null | tail -5',
+            warn=True,
+            hide=True
+        )
+        if systemd_result.ok and systemd_result.stdout.strip():
+            self.stdout.write(self.style.WARNING('  ⚠ Recent systemd errors:'))
+            for line in systemd_result.stdout.strip().split('\n')[:3]:
+                self.stdout.write(f'    {line[:100]}')
+            has_errors = True
+
+        # Check nginx error log
+        nginx_result = conn.run(
+            'tail -50 /var/log/nginx/error.log 2>/dev/null | grep -iE "error|crit|alert|emerg" | tail -5',
+            warn=True,
+            hide=True
+        )
+        if nginx_result.ok and nginx_result.stdout.strip():
+            self.stdout.write(self.style.WARNING('  ⚠ Recent nginx errors:'))
+            for line in nginx_result.stdout.strip().split('\n')[:3]:
+                self.stdout.write(f'    {line[:100]}')
+            has_errors = True
+
+        if not has_errors:
+            self.stdout.write(self.style.SUCCESS('  ✓ No recent errors found'))
