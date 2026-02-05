@@ -382,6 +382,15 @@ class Command(BaseCommand):
         conn.run(f'mkdir -p {install_path}/media')
         conn.run(f'mkdir -p {install_path}/static')
 
+        # Check if .env already exists and reuse SECRET_KEY if it does
+        result = conn.run(f'cat {install_path}/.env 2>/dev/null | grep "^SECRET_KEY="', warn=True, hide=True)
+        if result.ok and result.stdout.strip():
+            # Extract and reuse existing secret key
+            existing_key = result.stdout.strip().split('=', 1)[1].strip().strip('"').strip("'")
+            if existing_key:
+                config['secret_key'] = existing_key
+                self.stdout.write('  ℹ Reusing existing SECRET_KEY')
+
         # Generate .env file
         env_content = self.load_template('.env.template')
         env_content = self.render_template(env_content, config)
@@ -452,7 +461,10 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR('  ✗ Nginx configuration test failed'))
             raise Exception('Nginx configuration is invalid')
 
-        self.stdout.write(self.style.SUCCESS('  ✓ Nginx configured'))
+        # Reload nginx to apply changes
+        conn.sudo('systemctl reload nginx')
+
+        self.stdout.write(self.style.SUCCESS('  ✓ Nginx configured and reloaded'))
 
     def setup_ssl(self, conn, config):
         """Set up SSL certificate with certbot"""
@@ -464,7 +476,9 @@ class Command(BaseCommand):
             f'--non-interactive '
             f'--agree-tos '
             f'--email {email} '
-            f'-d {domain}'
+            f'-d {domain} '
+            f'--keep-until-expiring '  # Only obtain new cert if current one is expiring
+            f'--expand'  # Allow expanding certificate with additional domains
         )
 
         result = conn.sudo(cmd, warn=True)
@@ -475,13 +489,13 @@ class Command(BaseCommand):
 
     def start_services(self, conn, config):
         """Start all services"""
-        # Start and enable app service
+        # Enable and restart app service (restart ensures config changes are applied)
         conn.sudo('systemctl enable mosaic-app.service')
-        conn.sudo('systemctl start mosaic-app.service')
+        conn.sudo('systemctl restart mosaic-app.service')
 
-        # Start and enable backup timer
+        # Enable and restart backup timer
         conn.sudo('systemctl enable mosaic-backup.timer')
-        conn.sudo('systemctl start mosaic-backup.timer')
+        conn.sudo('systemctl restart mosaic-backup.timer')
 
         # Reload nginx
         conn.sudo('systemctl reload nginx')
