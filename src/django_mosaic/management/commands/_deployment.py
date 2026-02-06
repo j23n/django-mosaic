@@ -175,7 +175,15 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
 
-            # Step 4: Transfer project files to VPS
+            # Step 4: Configure firewall
+            self.stdout.write('\n🔥 Configuring firewall...')
+            try:
+                self.setup_firewall(conn, config)
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
+                return
+
+            # Step 5: Transfer project files to VPS
             self.stdout.write('\n📦 Transferring project files...')
             try:
                 self.transfer_project_files(conn, config)
@@ -183,7 +191,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
 
-            # Step 5: Build Docker image on VPS
+            # Step 6: Build Docker image on VPS
             self.stdout.write('\n🐳 Building Docker image on VPS...')
             try:
                 self.build_docker_image_remote(conn, config)
@@ -191,7 +199,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
 
-            # Step 6: Generate and upload configuration files
+            # Step 7: Generate and upload configuration files
             self.stdout.write('\n⚙️  Setting up configuration...')
             try:
                 self.setup_configuration(conn, config)
@@ -199,7 +207,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
 
-            # Step 7: Create systemd services
+            # Step 8: Create systemd services
             self.stdout.write('\n🔧 Creating systemd services...')
             try:
                 self.setup_systemd_services(conn, config)
@@ -207,7 +215,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
 
-            # Step 8: Configure nginx
+            # Step 9: Configure nginx
             self.stdout.write('\n🌐 Configuring nginx...')
             try:
                 self.setup_nginx(conn, config)
@@ -215,7 +223,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
 
-            # Step 9: Set up SSL with certbot
+            # Step 10: Set up SSL with certbot
             self.stdout.write('\n🔒 Setting up SSL certificate...')
             try:
                 self.setup_ssl(conn, config)
@@ -223,7 +231,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f'  ⚠ Warning: {str(e)}'))
                 # Continue even if SSL fails - it can be set up later
 
-            # Step 10: Start services
+            # Step 11: Start services
             self.stdout.write('\n🚀 Starting services...')
             try:
                 self.start_services(conn, config)
@@ -265,12 +273,30 @@ class Command(BaseCommand):
     def install_system_dependencies(self, conn, config):
         """Install Docker, nginx, certbot on the VPS"""
         self._sudo(conn, 'apt-get update', description='Updating package lists')
-        self._sudo(conn, 'apt-get install -y docker.io nginx certbot python3-certbot-nginx',
-                   description='Installing Docker, nginx, and certbot')
+        self._sudo(conn, 'apt-get install -y docker.io nginx certbot python3-certbot-nginx ufw',
+                   description='Installing Docker, nginx, certbot, and UFW firewall')
         self._sudo(conn, 'systemctl enable docker', description='Enabling Docker service')
         self._sudo(conn, 'systemctl start docker', description='Starting Docker service')
 
         self.stdout.write(self.style.SUCCESS('\n  ✓ Dependencies installed'))
+
+    def setup_firewall(self, conn, config):
+        """Configure UFW firewall"""
+        # Allow SSH (critical - do this first to avoid lockout)
+        self._sudo(conn, 'ufw allow 22/tcp', description='Allowing SSH (port 22)')
+
+        # Allow HTTP and HTTPS
+        self._sudo(conn, 'ufw allow 80/tcp', description='Allowing HTTP (port 80)')
+        self._sudo(conn, 'ufw allow 443/tcp', description='Allowing HTTPS (port 443)')
+
+        # Set default policies
+        self._sudo(conn, 'ufw default deny incoming', description='Setting default deny for incoming')
+        self._sudo(conn, 'ufw default allow outgoing', description='Setting default allow for outgoing')
+
+        # Enable UFW
+        self._sudo(conn, 'ufw --force enable', description='Enabling UFW firewall')
+
+        self.stdout.write(self.style.SUCCESS('\n  ✓ Firewall configured'))
 
     def transfer_project_files(self, conn, config):
         """Transfer project files to VPS"""
