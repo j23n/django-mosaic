@@ -1,0 +1,44 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+
+# Database - NEVER include in image
+db.sqlite3
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Static/media files - mounted as volumes
+static/
+staticfiles/
+media/
+
+# Git
+.git/
+.gitignore
+
+# Deployment config (sensitive)
+.deployment-config.toml
+.env
+.env.*
+
+# Development/testing
+.pytest_cache/
+.coverage
+htmlcov/
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

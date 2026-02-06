@@ -8,7 +8,7 @@ Usage:
 
 from django.core.management.base import BaseCommand
 import sys
-from ._deployment import Command as DeploymentCommand
+from ._deployment import DeploymentHandler
 
 
 class Command(BaseCommand):
@@ -37,9 +37,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         command = options.get('command')
+        subcommand = options.get('subcommand')
 
         if command == 'deployment':
-            deployment_cmd = DeploymentCommand(stdout=self.stdout, stderr=self.stderr, no_color=self.style.NO_COLOR)
-            deployment_cmd.handle(*args, **options)
+            handler = DeploymentHandler(stdout=self.stdout, style=self.style)
+
+            if subcommand == 'setup':
+                handler.run_setup(options)
+            elif subcommand == 'status':
+                handler.check_status(options)
+            else:
+                self.stdout.write(self.style.ERROR(f'Unknown deployment subcommand: {subcommand}'))
         else:
             self.stdout.write(self.style.ERROR(f'Unknown command: {command}'))

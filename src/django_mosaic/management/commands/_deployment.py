@@ -8,7 +8,6 @@ This module is called via the mosaic command:
 Not meant to be called directly.
 """
 
-from django.core.management.base import BaseCommand
 from django.core.management.utils import get_random_secret_key
 from django.conf import settings as django_settings
 from fabric import Connection
@@ -21,14 +20,19 @@ from pathlib import Path
 from .config_manager import ConfigManager
 
 
-class Command(BaseCommand):
-    help = 'Deploy mosaic blog to a VPS'
+class DeploymentHandler:
+    """Handles deployment operations for mosaic blog"""
 
-    def handle(self, *args, **options):
-        if options['subcommand'] == 'setup':
-            self.run_setup(options)
-        elif options['subcommand'] == 'status':
-            self.check_status(options)
+    def __init__(self, stdout, style):
+        """
+        Initialize deployment handler.
+
+        Args:
+            stdout: Output stream for writing messages
+            style: Django command style object for colored output
+        """
+        self.stdout = stdout
+        self.style = style
 
     # =========================================================================
     # UTILITIES
@@ -316,14 +320,21 @@ class Command(BaseCommand):
             with open(tmpdir / 'Dockerfile', 'w') as f:
                 f.write(dockerfile_content)
 
+            # Copy .dockerignore
+            dockerignore_content = self.load_template('.dockerignore')
+            with open(tmpdir / '.dockerignore', 'w') as f:
+                f.write(dockerignore_content)
+
             # Render and save entrypoint script
             entrypoint_content = self.load_template('docker-entrypoint.sh')
             with open(tmpdir / 'docker-entrypoint.sh', 'w') as f:
                 f.write(entrypoint_content)
 
-            # Transfer Dockerfile and entrypoint
+            # Transfer Dockerfile, .dockerignore, and entrypoint
             self._put(conn, str(tmpdir / 'Dockerfile'), f'{build_path}/Dockerfile',
                       description='Uploading Dockerfile')
+            self._put(conn, str(tmpdir / '.dockerignore'), f'{build_path}/.dockerignore',
+                      description='Uploading .dockerignore')
             self._put(conn, str(tmpdir / 'docker-entrypoint.sh'), f'{build_path}/docker-entrypoint.sh',
                       description='Uploading Docker entrypoint script')
 
@@ -384,9 +395,11 @@ class Command(BaseCommand):
 
         # Create installation directory
         self._run(conn, f'mkdir -p {install_path}', description='Creating installation directory')
-        self._run(conn, f'mkdir -p {install_path}/db', description='Creating database directory')
         self._run(conn, f'mkdir -p {install_path}/media', description='Creating media directory')
         self._run(conn, f'mkdir -p {install_path}/static', description='Creating static files directory')
+
+        # Create empty database file if it doesn't exist (required for Docker volume mount)
+        self._run(conn, f'touch {install_path}/db.sqlite3', description='Creating database file')
 
         # Check if .env already exists and reuse SECRET_KEY if it does
         result = self._run(conn, f'cat {install_path}/.env 2>/dev/null | grep "^SECRET_KEY="',
