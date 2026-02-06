@@ -27,4 +27,10 @@ RUN chmod +x /app/docker-entrypoint.sh
 EXPOSE 8000
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "{{GUNICORN_WORKERS}}", "{{WSGI_MODULE}}"]
+CMD ["gunicorn", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "{{GUNICORN_WORKERS}}", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info", \
+     "{{WSGI_MODULE}}"]
