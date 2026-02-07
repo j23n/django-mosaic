@@ -589,12 +589,8 @@ class DeploymentHandler:
             self.stdout.write('\n🌐 Nginx:')
             self.check_nginx_status(conn)
 
-            # Check SSL certificate
-            self.stdout.write('\n🔒 SSL Certificate:')
-            self.check_ssl_status(conn, config)
-
-            # Check application health
-            self.stdout.write('\n🏥 Application Health:')
+            # Check application health (includes SSL certificate check)
+            self.stdout.write('\n🏥 Application Health & SSL:')
             self.check_application_health(conn, config)
 
             # Check disk space
@@ -650,7 +646,7 @@ class DeploymentHandler:
         app_name = config.get('app_name', 'mosaic')
 
         # Check if container is running
-        result = conn.run(f'docker ps --filter "name={app_name}" --format "{{{{.Names}}}}|{{{{.Status}}}}|{{{{.Image}}}}"', warn=True, hide=True)
+        result = conn.sudo(f'docker ps --filter "name={app_name}" --format "{{{{.Names}}}}|{{{{.Status}}}}|{{{{.Image}}}}"', warn=True, hide=True)
         if result.ok and result.stdout.strip():
             container_info = result.stdout.strip().split('|')
             if len(container_info) >= 3:
@@ -713,20 +709,27 @@ class DeploymentHandler:
                 status_code = result.stdout.strip()
                 if status_code.startswith('2') or status_code.startswith('3'):
                     self.stdout.write(self.style.SUCCESS(f'  ✓ Application responding ({protocol.upper()} {status_code})'))
+
+                    # If HTTPS is working, also check certificate expiry
+                    if protocol == 'https':
+                        cert_info = conn.run(
+                            f'echo | openssl s_client -servername {domain} -connect {domain}:443 2>/dev/null | '
+                            f'openssl x509 -noout -dates',
+                            warn=True,
+                            hide=True
+                        )
+                        if cert_info.ok and cert_info.stdout.strip():
+                            for line in cert_info.stdout.strip().split('\n'):
+                                if 'notAfter' in line:
+                                    expiry = line.replace('notAfter=', '').strip()
+                                    self.stdout.write(f'  ✓ SSL certificate expires: {expiry}')
+
                     return
                 else:
                     self.stdout.write(self.style.WARNING(f'  ⚠ Application returned {protocol.upper()} {status_code}'))
                     return
 
         self.stdout.write(self.style.ERROR(f'  ✗ Application not responding at {domain}'))
-
-    def check_ssl_status(self, conn, config):
-        """Check SSL certificate status"""
-        result = conn.run('certbot certificates', warn=True, hide=True)
-        if result.ok and 'VALID' in result.stdout:
-            self.stdout.write(self.style.SUCCESS('  ✓ Certificate valid'))
-        else:
-            self.stdout.write(self.style.WARNING('  ⚠ No valid certificate found'))
 
     def check_disk_status(self, conn):
         """Check disk space"""
