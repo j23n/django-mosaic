@@ -1,0 +1,34 @@
+[Unit]
+Description={{APP_NAME}} Django Application
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory={{INSTALL_PATH}}
+
+# Stop and remove existing container if it exists
+ExecStartPre=-/usr/bin/docker stop {{APP_NAME}}
+ExecStartPre=-/usr/bin/docker rm {{APP_NAME}}
+
+# Start container (runs in foreground)
+ExecStart=/usr/bin/docker run \
+    --rm \
+    --name {{APP_NAME}} \
+    --log-driver journald \
+    --log-opt tag={{APP_NAME}} \
+    --env-file {{INSTALL_PATH}}/.env \
+    -p 127.0.0.1:8000:8000 \
+    -v {{INSTALL_PATH}}/media:/app/media \
+    -v {{INSTALL_PATH}}/static:/app/staticfiles \
+    -v {{INSTALL_PATH}}/db.sqlite3:/app/db.sqlite3 \
+    {{APP_NAME}}:latest
+
+# Container cleanup on stop
+ExecStop=/usr/bin/docker stop {{APP_NAME}}
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
