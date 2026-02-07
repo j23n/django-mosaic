@@ -686,7 +686,8 @@ label {
 .gallery-3 > figure > figcaption {
   padding: 0 1em 1em 1em;
 }
-.gallery-3 img {
+.gallery-3 img,
+.gallery-2 img {
   object-fit: cover;
   width:100%;
   aspect-ratio:1/1;
