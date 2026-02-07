@@ -188,7 +188,7 @@ class DeploymentHandler:
             # Step 2: Test SSH connection
             self.stdout.write('\n📡 Testing SSH connection...')
             try:
-                conn = self.test_ssh_connection(config)
+                conn = self.test_ssh_connection()
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
@@ -196,7 +196,7 @@ class DeploymentHandler:
             # Step 3: Install system dependencies
             self.stdout.write('\n📦 Installing system dependencies...')
             try:
-                self.install_system_dependencies(conn, config)
+                self.install_system_dependencies(conn)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
@@ -204,7 +204,7 @@ class DeploymentHandler:
             # Step 4: Configure firewall
             self.stdout.write('\n🔥 Configuring firewall...')
             try:
-                self.setup_firewall(conn, config)
+                self.setup_firewall(conn)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
@@ -212,7 +212,7 @@ class DeploymentHandler:
             # Step 5: Transfer project files to VPS
             self.stdout.write('\n📦 Transferring project files...')
             try:
-                self.transfer_project_files(conn, config)
+                self.transfer_project_files(conn)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
@@ -220,7 +220,7 @@ class DeploymentHandler:
             # Step 6: Build Docker image on VPS
             self.stdout.write('\n🐳 Building Docker image on VPS...')
             try:
-                self.build_docker_image_remote(conn, config)
+                self.build_docker_image_remote(conn)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
@@ -228,7 +228,7 @@ class DeploymentHandler:
             # Step 7: Generate and upload configuration files
             self.stdout.write('\n⚙️  Setting up configuration...')
             try:
-                self.setup_configuration(conn, config)
+                self.setup_configuration(conn)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
@@ -236,7 +236,7 @@ class DeploymentHandler:
             # Step 8: Create systemd services
             self.stdout.write('\n🔧 Creating systemd services...')
             try:
-                self.setup_systemd_services(conn, config)
+                self.setup_systemd_services(conn)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
@@ -244,7 +244,7 @@ class DeploymentHandler:
             # Step 9: Configure nginx
             self.stdout.write('\n🌐 Configuring nginx...')
             try:
-                self.setup_nginx(conn, config)
+                self.setup_nginx(conn)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
@@ -252,7 +252,7 @@ class DeploymentHandler:
             # Step 10: Set up SSL with certbot
             self.stdout.write('\n🔒 Setting up SSL certificate...')
             try:
-                self.setup_ssl(conn, config)
+                self.setup_ssl(conn)
             except Exception as e:
                 self.stdout.write(self.style.WARNING(f'  ⚠ Warning: {str(e)}'))
                 # Continue even if SSL fails - it can be set up later
@@ -260,12 +260,12 @@ class DeploymentHandler:
             # Step 11: Start services
             self.stdout.write('\n🚀 Starting services...')
             try:
-                self.start_services(conn, config)
+                self.start_services(conn)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'  ✗ Failed: {str(e)}'))
                 return
 
-            self.stdout.write(self.style.SUCCESS(f'\n✅ Deployment complete! Visit https://{config["domain"]}'))
+            self.stdout.write(self.style.SUCCESS(f'\n✅ Deployment complete! Visit https://{self.config["domain"]}'))
 
 
         except KeyboardInterrupt:
@@ -276,24 +276,24 @@ class DeploymentHandler:
             if conn:
                 conn.close()
 
-    def test_ssh_connection(self, config):
+    def test_ssh_connection(self):
         """Test SSH connection and return Connection object"""
         connect_kwargs = {}
-        if config.get('ssh_key'):
+        if self.config.get('ssh_key'):
             # Expand tilde to home directory
-            ssh_key_path = os.path.expanduser(config['ssh_key'])
+            ssh_key_path = os.path.expanduser(self.config['ssh_key'])
             connect_kwargs['key_filename'] = ssh_key_path
 
         conn = Connection(
-            host=config['host'],
-            user=config['user'],
+            host=self.config['host'],
+            user=self.config['user'],
             connect_kwargs=connect_kwargs,
         )
         result = conn.run('echo "Connection successful"', hide=True)
-        self.stdout.write(self.style.SUCCESS(f'  ✓ Connected to {config["host"]}'))
+        self.stdout.write(self.style.SUCCESS(f'  ✓ Connected to {self.config["host"]}'))
         return conn
 
-    def install_system_dependencies(self, conn, config):
+    def install_system_dependencies(self, conn):
         """Install Docker, nginx, certbot on the VPS"""
         self._sudo(conn, 'apt-get update', description='Updating package lists')
         self._sudo(conn, 'apt-get install -y docker.io nginx certbot python3-certbot-nginx ufw',
@@ -303,7 +303,7 @@ class DeploymentHandler:
 
         self.stdout.write(self.style.SUCCESS('\n  ✓ Dependencies installed'))
 
-    def setup_firewall(self, conn, config):
+    def setup_firewall(self, conn):
         """Configure UFW firewall"""
         # Allow SSH (critical - do this first to avoid lockout)
         self._sudo(conn, 'ufw allow 22/tcp', description='Allowing SSH (port 22)')
@@ -321,16 +321,16 @@ class DeploymentHandler:
 
         self.stdout.write(self.style.SUCCESS('\n  ✓ Firewall configured'))
 
-    def transfer_project_files(self, conn, config):
+    def transfer_project_files(self, conn):
         """Transfer project files to VPS"""
-        install_path = config['install_path']
+        install_path = self.config['install_path']
         build_path = f"{install_path}/build"
 
         # Create build directory on VPS
         self._sudo(conn, f'mkdir -p {build_path}', description='Creating build directory on VPS')
 
         # Make directory user owned
-        self._sudo(conn, f'chown -R {config["user"]} {build_path}', description='Give user permissions for the build directory')
+        self._sudo(conn, f'chown -R {self.config["user"]} {build_path}', description='Give user permissions for the build directory')
 
         # Create temporary directory for files to transfer
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -338,7 +338,7 @@ class DeploymentHandler:
 
             # Render and save Dockerfile
             dockerfile_content = self.load_template('Dockerfile')
-            dockerfile_content = self.render_template(dockerfile_content, config)
+            dockerfile_content = self.render_template(dockerfile_content, self.config)
             with open(tmpdir / 'Dockerfile', 'w') as f:
                 f.write(dockerfile_content)
 
@@ -362,7 +362,7 @@ class DeploymentHandler:
 
         # Create tar of current project (excluding venv, cache, etc.)
         project_root = Path.cwd()
-        tar_file = f'/tmp/{config["app_name"]}-project.tar.gz'
+        tar_file = f'/tmp/{self.config["app_name"]}-project.tar.gz'
 
         self.stdout.write('  Creating project archive...')
         subprocess.run([
@@ -380,7 +380,7 @@ class DeploymentHandler:
         ], cwd=project_root, check=True)
 
         # Transfer project archive
-        remote_tar = f'/tmp/{config["app_name"]}-project.tar.gz'
+        remote_tar = f'/tmp/{self.config["app_name"]}-project.tar.gz'
         self._put(conn, tar_file, remote_tar, description='Uploading project archive')
 
         # Extract on VPS
@@ -393,14 +393,14 @@ class DeploymentHandler:
 
         self.stdout.write(self.style.SUCCESS('  ✓ Project files transferred'))
 
-    def build_docker_image_remote(self, conn, config):
+    def build_docker_image_remote(self, conn):
         """Build Docker image on the VPS"""
-        build_path = f"{config['install_path']}/build"
+        build_path = f"{self.config['install_path']}/build"
 
         # Build the image
         result = self._sudo(
             conn,
-            f'docker build -t {config["app_name"]}:latest {build_path}',
+            f'docker build -t {self.config["app_name"]}:latest {build_path}',
             description='Building Docker image on VPS (this may take a few minutes)',
             warn=True
         )
@@ -411,16 +411,16 @@ class DeploymentHandler:
 
         self.stdout.write(self.style.SUCCESS('\n  ✓ Docker image built on VPS'))
 
-    def setup_configuration(self, conn, config):
+    def setup_configuration(self, conn):
         """Generate and upload .env and settings.py"""
-        install_path = config['install_path']
+        install_path = self.config['install_path']
 
         # Create installation directory
         self._sudo(conn, f'mkdir -p {install_path}', description='Creating installation directory')
         self._sudo(conn, f'mkdir -p {install_path}/media', description='Creating media directory')
         self._sudo(conn, f'mkdir -p {install_path}/static', description='Creating static files directory')
 
-        self._sudo(conn, f'chown -R {config["user"]} {install_path}', description='Giving the user permissions for the install directory')
+        self._sudo(conn, f'chown -R {self.config["user"]} {install_path}', description='Giving the user permissions for the install directory')
 
 
         # Create empty database file if it doesn't exist (required for Docker volume mount)
@@ -433,12 +433,12 @@ class DeploymentHandler:
             # Extract and reuse existing secret key
             existing_key = result.stdout.strip().split('=', 1)[1].strip().strip('"').strip("'")
             if existing_key:
-                config['secret_key'] = existing_key
+                self.config['secret_key'] = existing_key
                 self.stdout.write('  ℹ Reusing existing SECRET_KEY')
 
         # Generate .env file
         env_content = self.load_template('.env.template')
-        env_content = self.render_template(env_content, config)
+        env_content = self.render_template(env_content, self.config)
 
         with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
             f.write(env_content)
@@ -449,7 +449,7 @@ class DeploymentHandler:
 
         # Upload backup script
         backup_content = self.load_template('backup.sh')
-        backup_content = self.render_template(backup_content, config)
+        backup_content = self.render_template(backup_content, self.config)
 
         with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
             f.write(backup_content)
@@ -461,7 +461,7 @@ class DeploymentHandler:
 
         self.stdout.write(self.style.SUCCESS('  ✓ Configuration files uploaded'))
 
-    def setup_systemd_services(self, conn, config):
+    def setup_systemd_services(self, conn):
         """Create systemd service and timer for app and backups"""
         services = [
             ('mosaic-app.service', 'mosaic-app.service'),
@@ -471,7 +471,7 @@ class DeploymentHandler:
 
         for template_name, service_name in services:
             content = self.load_template(template_name)
-            content = self.render_template(content, config)
+            content = self.render_template(content, self.config)
 
             with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
                 f.write(content)
@@ -486,12 +486,12 @@ class DeploymentHandler:
         self._sudo(conn, 'systemctl daemon-reload', description='Reloading systemd daemon')
         self.stdout.write(self.style.SUCCESS('\n  ✓ Systemd services created'))
 
-    def setup_nginx(self, conn, config):
+    def setup_nginx(self, conn):
         """Configure nginx as reverse proxy"""
         nginx_content = self.load_template('nginx.conf')
-        nginx_content = self.render_template(nginx_content, config)
+        nginx_content = self.render_template(nginx_content, self.config)
 
-        site_name = config['app_name']
+        site_name = self.config['app_name']
 
         with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
             f.write(nginx_content)
@@ -515,10 +515,10 @@ class DeploymentHandler:
 
         self.stdout.write(self.style.SUCCESS('  ✓ Nginx configured and reloaded'))
 
-    def setup_ssl(self, conn, config):
+    def setup_ssl(self, conn):
         """Set up SSL certificate with certbot"""
-        domain = config['domain']
-        email = config['email']
+        domain = self.config['domain']
+        email = self.config['email']
 
         cmd = (
             f'certbot --nginx '
@@ -537,7 +537,7 @@ class DeploymentHandler:
             else:
                 self.stdout.write(self.style.WARNING('\n  ⚠ SSL setup failed (you may need to configure DNS first)'))
 
-    def start_services(self, conn, config):
+    def start_services(self, conn):
         """Start all services"""
         # Enable and restart app service (restart ensures config changes are applied)
         self._sudo(conn, 'systemctl enable mosaic-app.service', description='Enabling mosaic app service')
@@ -579,15 +579,15 @@ class DeploymentHandler:
         self.config = config
 
         try:
-            conn = self.test_ssh_connection(config)
+            conn = self.test_ssh_connection()
 
             # Check configuration files
             self.stdout.write('\n📄 Configuration Files:')
-            self.check_config_files(conn, config)
+            self.check_config_files(conn)
 
             # Check Docker
             self.stdout.write('\n🐳 Docker:')
-            self.check_docker_status(conn, config)
+            self.check_docker_status(conn)
 
             # Check systemd services
             self.stdout.write('\n⚙️  Services:')
@@ -599,7 +599,7 @@ class DeploymentHandler:
 
             # Check application health (includes SSL certificate check)
             self.stdout.write('\n🏥 Application Health & SSL:')
-            self.check_application_health(conn, config)
+            self.check_application_health(conn)
 
             # Check disk space
             self.stdout.write('\n💾 Disk Space:')
@@ -607,7 +607,7 @@ class DeploymentHandler:
 
             # Check last backup
             self.stdout.write('\n📦 Database Backup:')
-            self.check_backup_status(conn, config)
+            self.check_backup_status(conn)
 
             conn.close()
 
@@ -615,10 +615,10 @@ class DeploymentHandler:
             self.stdout.write(self.style.ERROR(f'Failed to check status: {e}'))
 
 
-    def check_config_files(self, conn, config):
+    def check_config_files(self, conn):
         """Check if critical configuration files exist"""
-        install_path = config.get('install_path', '/var/www/mosaic')
-        app_name = config.get('app_name', 'mosaic')
+        install_path = self.config.get('install_path', '/var/www/mosaic')
+        app_name = self.config.get('app_name', 'mosaic')
 
         files_to_check = [
             (f'{install_path}/.env', '.env file'),
@@ -645,9 +645,9 @@ class DeploymentHandler:
             else:
                 self.stdout.write(self.style.ERROR(f'  ✗ {description} missing'))
 
-    def check_docker_status(self, conn, config):
+    def check_docker_status(self, conn):
         """Check if Docker is running and show container status"""
-        app_name = config.get('app_name', 'mosaic')
+        app_name = self.config.get('app_name', 'mosaic')
 
         # Check if container is running
         result = self._sudo(conn, f'docker ps --filter "name={app_name}" --format "{{{{.Names}}}}|{{{{.Status}}}}|{{{{.Image}}}}"', warn=True, hide=True)
@@ -712,9 +712,9 @@ class DeploymentHandler:
         else:
             self.stdout.write(self.style.ERROR('  ✗ Nginx inactive'))
 
-    def check_application_health(self, conn, config):
+    def check_application_health(self, conn):
         """Check if application is responding to HTTP requests"""
-        domain = config.get('domain')
+        domain = self.config.get('domain')
         if not domain:
             self.stdout.write(self.style.WARNING('  ⚠ No domain configured, skipping health check'))
             return
@@ -761,9 +761,9 @@ class DeploymentHandler:
         if len(lines) >= 2:
             self.stdout.write(f'  {lines[1]}')
 
-    def check_backup_status(self, conn, config):
+    def check_backup_status(self, conn):
         """Check last backup time"""
-        install_path = config.get('install_path', '/var/www/mosaic')
+        install_path = self.config.get('install_path', '/var/www/mosaic')
         result = self._run(conn, f'ls -t {install_path}/backups/hourly/db-*.sqlite3 2>/dev/null | head -1', warn=True, hide=True)
         if result.ok and result.stdout.strip():
             latest = result.stdout.strip().split('/')[-1]
