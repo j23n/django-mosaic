@@ -666,11 +666,34 @@ label {
   display:block;
   padding:0 0 0.2em 0
 }
+.gallery-3,
+.gallery-2 {
+  display:grid;
+  column-gap:0.5em;
+  row-gap:0.5em;
+}
 .gallery-3 {
-  display: grid;
-  grid: 1fr 1fr 1fr;
+  grid-template-columns:repeat(3, 1fr);
 }
 .gallery-2 {
-  display: grid;
-  grid: 1fr 1fr;
+  grid-template-columns:repeat(2, 1fr);
+}
+.gallery-2 > figure,
+.gallery-3 > figure {
+  padding: 0;
+}
+.gallery-2 > figure > figcaption,
+.gallery-3 > figure > figcaption {
+  padding: 0 1em 1em 1em;
+}
+.gallery-3 img {
+  object-fit: cover;
+  width:100%;
+  aspect-ratio:1/1;
+}
+.gallery-3 p,
+.gallery-2 p,
+.gallery-3 img,
+.gallery-2 img {
+  margin:0;
 }
