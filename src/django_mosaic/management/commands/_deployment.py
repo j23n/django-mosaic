@@ -135,7 +135,26 @@ class DeploymentHandler:
         if self.dry_run:
             return None
 
-        return conn.put(local_path, remote_path)
+        # Use rsync instead of SFTP for better compatibility
+        rsync_cmd = ['rsync', '-avz']
+
+        # Add SSH options
+        ssh_opts = []
+        if hasattr(self, 'config') and self.config.get('ssh_key'):
+            ssh_key_path = os.path.expanduser(self.config['ssh_key'])
+            ssh_opts.append(f'-i {ssh_key_path}')
+
+        if ssh_opts:
+            rsync_cmd.extend(['-e', f'ssh {" ".join(ssh_opts)}'])
+
+        # Add source and destination
+        rsync_cmd.extend([
+            local_path,
+            f"{conn.user}@{conn.host}:{remote_path}"
+        ])
+
+        result = subprocess.run(rsync_cmd, check=True, capture_output=True, text=True)
+        return result
 
     # =========================================================================
     # SETUP COMMAND
@@ -159,6 +178,9 @@ class DeploymentHandler:
         try:
             # Step 1: Gather configuration
             config = config_manager.get_config(stdout=self.stdout)
+
+            # Store config as instance variable for use in helper methods
+            self.config = config
 
             # Generate secret key (not saved to file)
             config['secret_key'] = get_random_secret_key()
@@ -245,9 +267,6 @@ class DeploymentHandler:
 
             self.stdout.write(self.style.SUCCESS(f'\n✅ Deployment complete! Visit https://{config["domain"]}'))
 
-            # Save configuration for future use
-            self.stdout.write('\n💾 Saving configuration...')
-            config_manager.save_to_file(config)
 
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING('\n\n⚠ Deployment cancelled by user'))
@@ -308,7 +327,10 @@ class DeploymentHandler:
         build_path = f"{install_path}/build"
 
         # Create build directory on VPS
-        self._run(conn, f'mkdir -p {build_path}', description='Creating build directory on VPS')
+        self._sudo(conn, f'mkdir -p {build_path}', description='Creating build directory on VPS')
+
+        # Make directory user owned
+        self._sudo(conn, f'chown -R {config["user"]} {build_path}', description='Give user permissions for the build directory')
 
         # Create temporary directory for files to transfer
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -376,9 +398,9 @@ class DeploymentHandler:
         build_path = f"{config['install_path']}/build"
 
         # Build the image
-        result = self._run(
+        result = self._sudo(
             conn,
-            f'cd {build_path} && docker build -t {config["app_name"]}:latest .',
+            f'docker build -t {config["app_name"]}:latest {build_path}',
             description='Building Docker image on VPS (this may take a few minutes)',
             warn=True
         )
@@ -394,9 +416,12 @@ class DeploymentHandler:
         install_path = config['install_path']
 
         # Create installation directory
-        self._run(conn, f'mkdir -p {install_path}', description='Creating installation directory')
-        self._run(conn, f'mkdir -p {install_path}/media', description='Creating media directory')
-        self._run(conn, f'mkdir -p {install_path}/static', description='Creating static files directory')
+        self._sudo(conn, f'mkdir -p {install_path}', description='Creating installation directory')
+        self._sudo(conn, f'mkdir -p {install_path}/media', description='Creating media directory')
+        self._sudo(conn, f'mkdir -p {install_path}/static', description='Creating static files directory')
+
+        self._sudo(conn, f'chown -R {config["user"]} {install_path}', description='Giving the user permissions for the install directory')
+
 
         # Create empty database file if it doesn't exist (required for Docker volume mount)
         self._run(conn, f'touch {install_path}/db.sqlite3', description='Creating database file')

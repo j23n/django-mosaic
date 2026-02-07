@@ -255,7 +255,8 @@ class ConfigManager:
             dict: Complete configuration
         """
         # Start with saved config
-        config = self.load_from_file()
+        og_config = self.load_from_file()
+        config = og_config
 
         # Override with CLI args
         if cli_args:
@@ -267,5 +268,10 @@ class ConfigManager:
             required_fields=required_fields,
             stdout=stdout
         )
+
+        # Save configuration for future use
+        if og_config != config:
+            print('\n💾 Saving configuration...')
+            self.save_to_file(config)
 
         return config
