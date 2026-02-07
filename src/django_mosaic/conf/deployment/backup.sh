@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Tiered backup strategy: hourly backups are promoted to daily/weekly/monthly
+# This provides granular recent history and long-term retention without excessive storage
+
 BACKUP_DIR="{{INSTALL_PATH}}/backups"
 DB_FILE="{{INSTALL_PATH}}/db.sqlite3"
 

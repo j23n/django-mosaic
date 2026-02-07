@@ -9,6 +9,16 @@ import tomllib
 from pathlib import Path
 
 
+# Default configuration values
+DEFAULT_INSTALL_PATH = '/var/www/mosaic'
+DEFAULT_APP_NAME = 'mosaic'
+DEFAULT_GUNICORN_WORKERS = 2
+DEFAULT_WSGI_MODULE = 'website.wsgi:application'
+DEFAULT_URL_CONF = 'website.urls'
+DEFAULT_SSH_USER = 'root'
+DEFAULT_SSH_KEY = '~/.ssh/id_rsa'
+
+
 class ConfigManager:
     """Manages deployment configuration with TOML file persistence."""
 
@@ -119,11 +129,11 @@ class ConfigManager:
             },
             'user': {
                 'prompt': 'SSH user',
-                'default': 'root'
+                'default': DEFAULT_SSH_USER
             },
             'ssh_key': {
                 'prompt': 'SSH private key path',
-                'default': '~/.ssh/id_rsa',
+                'default': DEFAULT_SSH_KEY,
                 'validator': lambda x: Path(x).expanduser().exists(),
                 'error': 'SSH key file does not exist'
             },
@@ -135,7 +145,7 @@ class ConfigManager:
             },
             'install_path': {
                 'prompt': 'Installation path',
-                'default': '/var/www/mosaic'
+                'default': DEFAULT_INSTALL_PATH
             },
             'email': {
                 'prompt': 'Email for SSL certificate notifications',
@@ -145,23 +155,23 @@ class ConfigManager:
             },
             'app_name': {
                 'prompt': 'Application name',
-                'default': 'mosaic'
+                'default': DEFAULT_APP_NAME
             },
             'gunicorn_workers': {
                 'prompt': 'Number of Gunicorn workers',
-                'default': '2',
+                'default': str(DEFAULT_GUNICORN_WORKERS),
                 'validator': lambda x: x.isdigit() and int(x) > 0,
                 'error': 'Must be a positive integer'
             },
             'wsgi_module': {
                 'prompt': 'WSGI module',
-                'default': 'website.wsgi:application',
+                'default': DEFAULT_WSGI_MODULE,
                 'validator': lambda x: ':' in x and all(part.strip() for part in x.split(':')),
                 'error': 'Must be in format "module.path:application"'
             },
             'url_conf': {
                 'prompt': 'URL configuration module',
-                'default': 'website.urls',
+                'default': DEFAULT_URL_CONF,
                 'validator': lambda x: len(x.strip()) > 0 and ' ' not in x,
                 'error': 'Must be a valid Python module path'
             },

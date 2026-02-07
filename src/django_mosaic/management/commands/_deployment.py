@@ -6,6 +6,15 @@ This module is called via the mosaic command:
     python manage.py mosaic deployment status
 
 Not meant to be called directly.
+
+Design decisions:
+- Uses Docker for consistent deployment across different VPS environments
+- SQLite for simplicity - suitable for personal blogs, no database server needed
+- Nginx for static file serving and reverse proxy with rate limiting
+- Systemd for service management - standard on most Linux distributions
+- Rsync for file transfers - more efficient and reliable than SFTP
+- Interactive configuration with persistence to improve UX on repeated runs
+- Wrapper methods (_run, _sudo, _put) for consistent confirmation and logging
 """
 
 from django.core.management.utils import get_random_secret_key
@@ -18,6 +27,28 @@ import secrets
 from pathlib import Path
 
 from .config_manager import ConfigManager
+
+
+# Deployment constants
+DEFAULT_INSTALL_PATH = '/var/www/mosaic'
+DEFAULT_APP_NAME = 'mosaic'
+DEFAULT_GUNICORN_WORKERS = 2
+DEFAULT_WSGI_MODULE = 'website.wsgi:application'
+DEFAULT_URL_CONF = 'website.urls'
+
+# Backup retention policy (number of backups to keep)
+BACKUP_RETENTION = {
+    'hourly': 24,
+    'daily': 7,
+    'weekly': 4,
+    'monthly': 12,
+}
+
+# Service restart delay in seconds
+SERVICE_RESTART_DELAY = 10
+
+# Health check timeout in seconds
+HEALTH_CHECK_TIMEOUT = 5
 
 
 class DeploymentHandler:
@@ -180,6 +211,7 @@ class DeploymentHandler:
             config = config_manager.get_config(stdout=self.stdout)
 
             # Store config as instance variable for use in helper methods
+            # This avoids passing config to every method and provides single source of truth
             self.config = config
 
             # Generate secret key (not saved to file)
@@ -394,7 +426,14 @@ class DeploymentHandler:
         self.stdout.write(self.style.SUCCESS('  ✓ Project files transferred'))
 
     def build_docker_image_remote(self, conn):
-        """Build Docker image on the VPS"""
+        """
+        Build Docker image on the VPS.
+
+        We build on the VPS rather than locally to:
+        - Avoid large image transfers over network
+        - Support different architectures (e.g., deploy from Mac to Linux VPS)
+        - Keep local environment clean
+        """
         build_path = f"{self.config['install_path']}/build"
 
         # Build the image
@@ -427,6 +466,7 @@ class DeploymentHandler:
         self._run(conn, f'touch {install_path}/db.sqlite3', description='Creating database file')
 
         # Check if .env already exists and reuse SECRET_KEY if it does
+        # This preserves sessions and prevents logout on redeployment
         result = self._run(conn, f'cat {install_path}/.env 2>/dev/null | grep "^SECRET_KEY="',
                           description='Checking for existing SECRET_KEY', warn=True, hide=True)
         if not self.dry_run and result.ok and result.stdout.strip():
@@ -463,10 +503,11 @@ class DeploymentHandler:
 
     def setup_systemd_services(self, conn):
         """Create systemd service and timer for app and backups"""
+        app_name = self.config['app_name']
         services = [
-            ('mosaic-app.service', 'mosaic-app.service'),
-            ('mosaic-backup.service', 'mosaic-backup.service'),
-            ('mosaic-backup.timer', 'mosaic-backup.timer'),
+            ('mosaic-app.service', f'{app_name}-app.service'),
+            ('mosaic-backup.service', f'{app_name}-backup.service'),
+            ('mosaic-backup.timer', f'{app_name}-backup.timer'),
         ]
 
         for template_name, service_name in services:
@@ -539,13 +580,15 @@ class DeploymentHandler:
 
     def start_services(self, conn):
         """Start all services"""
+        app_name = self.config['app_name']
+
         # Enable and restart app service (restart ensures config changes are applied)
-        self._sudo(conn, 'systemctl enable mosaic-app.service', description='Enabling mosaic app service')
-        self._sudo(conn, 'systemctl restart mosaic-app.service', description='Starting mosaic app service')
+        self._sudo(conn, f'systemctl enable {app_name}-app.service', description='Enabling app service')
+        self._sudo(conn, f'systemctl restart {app_name}-app.service', description='Starting app service')
 
         # Enable and restart backup timer
-        self._sudo(conn, 'systemctl enable mosaic-backup.timer', description='Enabling backup timer')
-        self._sudo(conn, 'systemctl restart mosaic-backup.timer', description='Starting backup timer')
+        self._sudo(conn, f'systemctl enable {app_name}-backup.timer', description='Enabling backup timer')
+        self._sudo(conn, f'systemctl restart {app_name}-backup.timer', description='Starting backup timer')
 
         # Reload nginx
         self._sudo(conn, 'systemctl reload nginx', description='Reloading nginx')
@@ -617,15 +660,15 @@ class DeploymentHandler:
 
     def check_config_files(self, conn):
         """Check if critical configuration files exist"""
-        install_path = self.config.get('install_path', '/var/www/mosaic')
-        app_name = self.config.get('app_name', 'mosaic')
+        install_path = self.config.get('install_path', DEFAULT_INSTALL_PATH)
+        app_name = self.config.get('app_name', DEFAULT_APP_NAME)
 
         files_to_check = [
             (f'{install_path}/.env', '.env file'),
             (f'{install_path}/backup.sh', 'backup.sh script'),
-            (f'/etc/systemd/system/mosaic-app.service', 'mosaic-app.service'),
-            (f'/etc/systemd/system/mosaic-backup.service', 'mosaic-backup.service'),
-            (f'/etc/systemd/system/mosaic-backup.timer', 'mosaic-backup.timer'),
+            (f'/etc/systemd/system/{app_name}-app.service', f'{app_name}-app.service'),
+            (f'/etc/systemd/system/{app_name}-backup.service', f'{app_name}-backup.service'),
+            (f'/etc/systemd/system/{app_name}-backup.timer', f'{app_name}-backup.timer'),
             (f'/etc/nginx/sites-available/{app_name}', 'nginx site config'),
             (f'/etc/nginx/sites-enabled/{app_name}', 'nginx site symlink'),
         ]
@@ -647,7 +690,7 @@ class DeploymentHandler:
 
     def check_docker_status(self, conn):
         """Check if Docker is running and show container status"""
-        app_name = self.config.get('app_name', 'mosaic')
+        app_name = self.config.get('app_name', DEFAULT_APP_NAME)
 
         # Check if container is running
         result = self._sudo(conn, f'docker ps --filter "name={app_name}" --format "{{{{.Names}}}}|{{{{.Status}}}}|{{{{.Image}}}}"', warn=True, hide=True)
@@ -679,30 +722,32 @@ class DeploymentHandler:
 
     def check_services_status(self, conn):
         """Check systemd service status"""
+        app_name = self.config.get('app_name', DEFAULT_APP_NAME)
+
         # Check app service (should be continuously running)
-        result = self._run(conn, 'systemctl is-active mosaic-app.service', warn=True, hide=True)
+        result = self._run(conn, f'systemctl is-active {app_name}-app.service', warn=True, hide=True)
         if result.ok and 'active' in result.stdout:
-            self.stdout.write(self.style.SUCCESS('  ✓ mosaic-app.service active'))
+            self.stdout.write(self.style.SUCCESS(f'  ✓ {app_name}-app.service active'))
         else:
-            self.stdout.write(self.style.ERROR('  ✗ mosaic-app.service inactive'))
+            self.stdout.write(self.style.ERROR(f'  ✗ {app_name}-app.service inactive'))
 
         # Check backup timer (should be active)
-        result = self._run(conn, 'systemctl is-active mosaic-backup.timer', warn=True, hide=True)
+        result = self._run(conn, f'systemctl is-active {app_name}-backup.timer', warn=True, hide=True)
         if result.ok and 'active' in result.stdout:
-            self.stdout.write(self.style.SUCCESS('  ✓ mosaic-backup.timer active'))
+            self.stdout.write(self.style.SUCCESS(f'  ✓ {app_name}-backup.timer active'))
         else:
-            self.stdout.write(self.style.ERROR('  ✗ mosaic-backup.timer inactive'))
+            self.stdout.write(self.style.ERROR(f'  ✗ {app_name}-backup.timer inactive'))
 
         # Check backup service last run result (oneshot service, check exit status not active state)
-        result = self._run(conn, 'systemctl show mosaic-backup.service -p Result --value', warn=True, hide=True)
+        result = self._run(conn, f'systemctl show {app_name}-backup.service -p Result --value', warn=True, hide=True)
         if result.ok:
             status = result.stdout.strip()
             if status == 'success':
-                self.stdout.write(self.style.SUCCESS('  ✓ mosaic-backup.service last run: success'))
+                self.stdout.write(self.style.SUCCESS(f'  ✓ {app_name}-backup.service last run: success'))
             elif status == 'exit-code':
-                self.stdout.write(self.style.ERROR('  ✗ mosaic-backup.service last run: failed'))
+                self.stdout.write(self.style.ERROR(f'  ✗ {app_name}-backup.service last run: failed'))
             else:
-                self.stdout.write(self.style.WARNING(f'  ⚠ mosaic-backup.service last run: {status}'))
+                self.stdout.write(self.style.WARNING(f'  ⚠ {app_name}-backup.service last run: {status}'))
 
     def check_nginx_status(self, conn):
         """Check nginx status"""
@@ -723,7 +768,7 @@ class DeploymentHandler:
         for protocol in ['https', 'http']:
             result = self._run(
                 conn,
-                f'curl -s -o /dev/null -w "%{{http_code}}" --max-time 5 {protocol}://{domain}/',
+                f'curl -s -o /dev/null -w "%{{http_code}}" --max-time {HEALTH_CHECK_TIMEOUT} {protocol}://{domain}/',
                 warn=True,
                 hide=True
             )
@@ -763,7 +808,7 @@ class DeploymentHandler:
 
     def check_backup_status(self, conn):
         """Check last backup time"""
-        install_path = self.config.get('install_path', '/var/www/mosaic')
+        install_path = self.config.get('install_path', DEFAULT_INSTALL_PATH)
         result = self._run(conn, f'ls -t {install_path}/backups/hourly/db-*.sqlite3 2>/dev/null | head -1', warn=True, hide=True)
         if result.ok and result.stdout.strip():
             latest = result.stdout.strip().split('/')[-1]
