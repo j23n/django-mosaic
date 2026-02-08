@@ -39,7 +39,7 @@ class ContentImageInlineAdmin(admin.TabularInline):
 
 class PostAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at"]
-    list_display = ["title", "published_at", "namespace", "is_published", "created_at"]
+    list_display = ["title", "is_published", "published_at", "namespace", "get_tags", "changed_at"]
     list_filter = ["is_published", "namespace", "tags", "published_at"]
 
     formfield_overrides = {
@@ -51,6 +51,9 @@ class PostAdmin(admin.ModelAdmin):
     }
 
     inlines = [ContentImageInlineAdmin]
+
+    def get_tags(self, obj):
+        return ", ".join([t.name for t in obj.tags.all()])
 
 
 class ContentImageAdmin(admin.ModelAdmin):
