@@ -39,7 +39,7 @@ def post_detail(request, namespace, year, post_slug):
 def tag_detail(request, namespace, name):
     tag = get_object_or_404(Tag, name=name, namespace__name=namespace)
 
-    posts = _get_posts(namespace).filter(tags__name=tag)
+    posts = _get_posts(namespace).filter(tags=tag)
 
     return render(
         request,
