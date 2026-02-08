@@ -28,8 +28,11 @@ def post_list(request, namespace):
 def post_detail(request, namespace, year, post_slug):
     post = get_object_or_404(Post, slug=post_slug)
 
+    next_post = Post.objects.filter(namespace=post.namespace, published_at__gt=post.published_at).reverse().first()
+    prev_post = Post.objects.filter(namespace=post.namespace, published_at__lt=post.published_at).first()
+
     return render(
-        request, "post-detail.html", {"post": post, "CONSTANTS": settings.CONSTANTS}
+        request, "post-detail.html", {"post": post, "next_post": next_post, "prev_post": prev_post, "CONSTANTS": settings.CONSTANTS}
     )
 
 

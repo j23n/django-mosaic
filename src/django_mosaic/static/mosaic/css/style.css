@@ -698,3 +698,15 @@ label {
 .gallery-2 img {
   margin:0;
 }
+
+.post-nav {
+  display:grid;
+  gap:0.5em;
+  grid-template-columns:repeat(2, 1fr)
+}
+.post-nav .prev {
+
+}
+.post-nav .next {
+  text-align:right;
+}

@@ -22,4 +22,11 @@ by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.userna
 </div>
 
 </article>
+
+<hr>
+
+<div class="post-nav">
+<div class="prev">Previous: <a href="{{ prev_post.get_absolute_url }}" class="muted">{{ prev_post.title|truncatechars:20|default:"This was the last post" }}</a></div>
+<div class="next">Next: <a href="{{ next_post.get_absolute_url }}" class="muted">{{ next_post.title|truncatechars:20|default:"None yet :-)" }}</a></div>
+</div>
 {% endblock %}
