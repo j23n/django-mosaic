@@ -17,8 +17,7 @@ db.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
 
-# Static/media files - mounted as volumes
-static/
+# Collected static and media - mounted as volumes
 staticfiles/
 media/
 
