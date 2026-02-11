@@ -39,8 +39,12 @@ class Command(BaseCommand):
                     slug = header.get("slug", slugify(header["title"]))
 
                     tags = []
-                    header_tags = [t.strip() for t in header.get("tags", "").split(",") if t]
-                    header_categories = [c.strip() for c in header.get("categories", "").split(",") if c]
+                    header_tags = [
+                        t.strip() for t in header.get("tags", "").split(",") if t
+                    ]
+                    header_categories = [
+                        c.strip() for c in header.get("categories", "").split(",") if c
+                    ]
                     header_tags.extend(header_categories)
 
                     if header_tags:

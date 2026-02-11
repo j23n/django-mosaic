@@ -28,12 +28,28 @@ def post_list(request, namespace):
 def post_detail(request, namespace, year, post_slug):
     post = get_object_or_404(Post, slug=post_slug)
 
-    next_post = Post.objects.filter(namespace=post.namespace, published_at__gt=post.published_at).reverse().first()
-    prev_post = Post.objects.filter(namespace=post.namespace, published_at__lt=post.published_at).first()
+    next_post = (
+        Post.objects.filter(
+            namespace=post.namespace, published_at__gt=post.published_at
+        )
+        .reverse()
+        .first()
+    )
+    prev_post = Post.objects.filter(
+        namespace=post.namespace, published_at__lt=post.published_at
+    ).first()
 
     return render(
-        request, "post-detail.html", {"post": post, "next_post": next_post, "prev_post": prev_post, "CONSTANTS": settings.CONSTANTS}
+        request,
+        "post-detail.html",
+        {
+            "post": post,
+            "next_post": next_post,
+            "prev_post": prev_post,
+            "CONSTANTS": settings.CONSTANTS,
+        },
     )
+
 
 def draft_detail(request, namespace, secret_id):
     post = get_object_or_404(Post, secret_id=secret_id)
@@ -41,6 +57,7 @@ def draft_detail(request, namespace, secret_id):
     return render(
         request, "post-detail.html", {"post": post, "CONSTANTS": settings.CONSTANTS}
     )
+
 
 def tag_detail(request, namespace, name):
     tag = get_object_or_404(Tag, name=name, namespace__name=namespace)

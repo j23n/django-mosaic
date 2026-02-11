@@ -113,7 +113,9 @@ class Post(models.Model):
     published_at = models.DateTimeField(blank=True, null=True)
     changed_at = models.DateTimeField(auto_now=True, blank=False, null=False)
 
-    secret_id = models.CharField(max_length=128, blank=False, null=False, default=lambda: secrets.token_hex(32))
+    secret_id = models.CharField(
+        max_length=128, blank=False, null=False, default=lambda: secrets.token_hex(32)
+    )
 
     def save(self, *args, **kwargs):
         # no longer update the slug once it's been published
@@ -132,12 +134,11 @@ class Post(models.Model):
     def get_absolute_url(self):
         if self.is_published:
             return reverse(
-                "post-detail", args=[self.namespace.name, self.published_at.year, self.slug]
+                "post-detail",
+                args=[self.namespace.name, self.published_at.year, self.slug],
             )
         else:
-            return reverse(
-                "draft-detail", args=[self.secret_id]
-            )
+            return reverse("draft-detail", args=[self.secret_id])
 
     def __str__(self):
         return f"{self.title}"

@@ -39,7 +39,14 @@ class ContentImageInlineAdmin(admin.TabularInline):
 
 class PostAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at"]
-    list_display = ["title", "is_published", "published_at", "namespace", "get_tags", "changed_at"]
+    list_display = [
+        "title",
+        "is_published",
+        "published_at",
+        "namespace",
+        "get_tags",
+        "changed_at",
+    ]
     list_filter = ["is_published", "namespace", "tags", "published_at"]
 
     formfield_overrides = {
