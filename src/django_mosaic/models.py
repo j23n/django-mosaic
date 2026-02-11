@@ -58,7 +58,7 @@ class ContentImage(models.Model):
             try:
                 # Generate random filename
                 ext = self.image.name.split(".")[-1]
-                random_name = secrets.token_hex(16)
+                random_name = secrets.token_hex(32)
                 new_filename = f"{random_name}.{ext}"
 
                 # Rename the image file
@@ -113,6 +113,8 @@ class Post(models.Model):
     published_at = models.DateTimeField(blank=True, null=True)
     changed_at = models.DateTimeField(auto_now=True, blank=False, null=False)
 
+    secret_id = models.CharField(max_length=128, blank=False, null=False, default=lambda: secrets.token_hex(32))
+
     def save(self, *args, **kwargs):
         # no longer update the slug once it's been published
         if not self.is_published and not self.slug:
@@ -128,9 +130,14 @@ class Post(models.Model):
         return super().save(*args, **kwargs)
 
     def get_absolute_url(self):
-        return reverse(
-            "post-detail", args=[self.namespace.name, self.published_at.year, self.slug]
-        )
+        if self.is_published:
+            return reverse(
+                "post-detail", args=[self.namespace.name, self.published_at.year, self.slug]
+            )
+        else:
+            return reverse(
+                "draft-detail", args=[self.secret_id]
+            )
 
     def __str__(self):
         return f"{self.title}"

@@ -35,6 +35,12 @@ def post_detail(request, namespace, year, post_slug):
         request, "post-detail.html", {"post": post, "next_post": next_post, "prev_post": prev_post, "CONSTANTS": settings.CONSTANTS}
     )
 
+def draft_detail(request, namespace, secret_id):
+    post = get_object_or_404(Post, secret_id=secret_id)
+
+    return render(
+        request, "post-detail.html", {"post": post, "CONSTANTS": settings.CONSTANTS}
+    )
 
 def tag_detail(request, namespace, name):
     tag = get_object_or_404(Tag, name=name, namespace__name=namespace)
