@@ -287,11 +287,14 @@ mark {
   background-color:var(--color-highlight);
   color:var(--color-tx-normal)
 }
-footer {
-  margin:2em auto;
-  max-width:var(--wrap-wide);
-  width:var(--wrap-normal);
-  padding-top:1em
+footer > .links {
+  color:var(--color-tx-faint);
+  font-size:var(--font-small);
+}
+footer > .credit {
+  color:var(--color-tx-faint);
+  font-size:var(--font-smaller);
+  text-align:center;
 }
 p {
   max-width:var(--wrap-normal)
@@ -311,7 +314,8 @@ hr {
   margin:1.5em 0;
   background:var(--color-ui-normal)
 }
-main>hr {
+main>hr,
+footer>hr {
   margin:4em 0
 }
 heading {

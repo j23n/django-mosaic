@@ -7,21 +7,21 @@ def _get_posts(namespace="public"):
     return Post.objects.filter(namespace__name=namespace, is_published=True)
 
 
-def home(request):
-    posts = _get_posts()
+def home(request, namespace="public"):
+    posts = _get_posts(namespace)
     tags = Tag.objects.filter(post__in=posts).distinct()
 
     return render(
         request,
         "home.html",
-        {"posts": posts, "tags": tags, "CONSTANTS": settings.CONSTANTS},
+        {"posts": posts, "tags": tags, "CONSTANTS": settings.CONSTANTS, "namespace": namespace},
     )
 
 
 def post_list(request, namespace):
     posts = _get_posts(namespace)
     return render(
-        request, "post-list.html", {"posts": posts, "CONSTANTS": settings.CONSTANTS}
+        request, "post-list.html", {"posts": posts, "CONSTANTS": settings.CONSTANTS, "namespace": namespace}
     )
 
 
@@ -47,6 +47,7 @@ def post_detail(request, namespace, year, post_slug):
             "next_post": next_post,
             "prev_post": prev_post,
             "CONSTANTS": settings.CONSTANTS,
+            "namespace": namespace,
         },
     )
 
@@ -67,7 +68,7 @@ def tag_detail(request, namespace, name):
     return render(
         request,
         "tag-detail.html",
-        {"posts": posts, "tag": tag, "CONSTANTS": settings.CONSTANTS},
+        {"posts": posts, "tag": tag, "CONSTANTS": settings.CONSTANTS, "namespace": namespace},
     )
 
 
