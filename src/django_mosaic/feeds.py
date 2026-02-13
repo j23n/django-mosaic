@@ -7,9 +7,13 @@ from django_mosaic.models import Post, Namespace
 
 
 class PostFeed(Feed):
-    title = settings.CONSTANTS["site"]["title"]
     link = "/"
-    description = settings.CONSTANTS["site"]["description"]
+
+    def title(self):
+        return settings.CONSTANTS["site"]["title"]
+
+    def description(self):
+        return settings.CONSTANTS["site"]["description"]
 
     def get_object(self, request, namespace):
         return Namespace.objects.get(name=namespace)

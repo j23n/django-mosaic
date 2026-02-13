@@ -71,5 +71,5 @@ class Command(BaseCommand):
                     for t in tags:
                         post.tags.add(t)
                     logger.info(f"Created post {post} with tags {tags}")
-                except Exception as e:
+                except (ValueError, OSError, Tag.DoesNotExist) as e:
                     logger.error(f"Could not import {file}: {e}", exc_info=True)

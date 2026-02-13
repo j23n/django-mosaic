@@ -1,5 +1,4 @@
 from django.shortcuts import render, get_object_or_404
-from django.conf import settings
 from django_mosaic.models import Post, Tag
 
 
@@ -14,14 +13,14 @@ def home(request, namespace="public"):
     return render(
         request,
         "home.html",
-        {"posts": posts, "tags": tags, "CONSTANTS": settings.CONSTANTS, "namespace": namespace},
+        {"posts": posts, "tags": tags, "namespace": namespace},
     )
 
 
 def post_list(request, namespace):
     posts = _get_posts(namespace)
     return render(
-        request, "post-list.html", {"posts": posts, "CONSTANTS": settings.CONSTANTS, "namespace": namespace}
+        request, "post-list.html", {"posts": posts, "namespace": namespace}
     )
 
 
@@ -52,7 +51,6 @@ def post_detail(request, namespace, year, post_slug):
             "post": post,
             "next_post": next_post,
             "prev_post": prev_post,
-            "CONSTANTS": settings.CONSTANTS,
             "namespace": namespace,
         },
     )
@@ -62,7 +60,7 @@ def draft_detail(request, namespace, secret_id):
     post = get_object_or_404(Post, secret_id=secret_id)
 
     return render(
-        request, "post-detail.html", {"post": post, "CONSTANTS": settings.CONSTANTS}
+        request, "post-detail.html", {"post": post}
     )
 
 
@@ -74,7 +72,7 @@ def tag_detail(request, namespace, name):
     return render(
         request,
         "tag-detail.html",
-        {"posts": posts, "tag": tag, "CONSTANTS": settings.CONSTANTS, "namespace": namespace},
+        {"posts": posts, "tag": tag, "namespace": namespace},
     )
 
 

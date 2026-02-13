@@ -26,14 +26,14 @@ import os
 import secrets
 from pathlib import Path
 
-from .config_manager import ConfigManager
-
-# Deployment constants
-DEFAULT_INSTALL_PATH = "/var/www/mosaic"
-DEFAULT_APP_NAME = "mosaic"
-DEFAULT_GUNICORN_WORKERS = 2
-DEFAULT_WSGI_MODULE = "website.wsgi:application"
-DEFAULT_URL_CONF = "website.urls"
+from .config_manager import (
+    ConfigManager,
+    DEFAULT_INSTALL_PATH,
+    DEFAULT_APP_NAME,
+    DEFAULT_GUNICORN_WORKERS,
+    DEFAULT_WSGI_MODULE,
+    DEFAULT_URL_CONF,
+)
 
 # Backup retention policy (number of backups to keep)
 BACKUP_RETENTION = {

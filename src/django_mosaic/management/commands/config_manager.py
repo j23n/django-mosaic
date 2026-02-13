@@ -47,7 +47,7 @@ class ConfigManager:
         try:
             with open(self.config_file, "rb") as f:
                 return tomllib.load(f)
-        except Exception as e:
+        except (OSError, tomllib.TOMLDecodeError) as e:
             print(f"Warning: Failed to load config from {self.config_file}: {e}")
             return {}
 
@@ -91,7 +91,7 @@ class ConfigManager:
 
             print(f"✓ Configuration saved to {self.config_file}")
 
-        except Exception as e:
+        except OSError as e:
             print(f"Warning: Failed to save config to {self.config_file}: {e}")
 
     def gather_interactively(
@@ -252,7 +252,7 @@ class ConfigManager:
                             )
                         else:
                             print(f"✗ {error_msg}. Please try again.")
-                except Exception:
+                except (ValueError, TypeError):
                     if stdout:
                         stdout.write(
                             stdout.style.ERROR(f"  ✗ {error_msg}. Please try again.")

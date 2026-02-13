@@ -102,7 +102,7 @@ class ContentImage(models.Model):
                 self.thumb.save(
                     thumb_filename, ContentFile(thumb_io.read()), save=False
                 )
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 logger.warning(f"Failed to create thumbnail: {e}")
 
         super().save(*args, **kwargs)
