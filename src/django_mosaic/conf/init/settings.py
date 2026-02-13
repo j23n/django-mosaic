@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sitemaps",
     # Mosaic dependencies
     "markdownify.apps.MarkdownifyConfig",
     "django_magic_authorization",
@@ -138,6 +139,13 @@ MEDIA_ROOT = os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+CONSTANTS = {
+    "site": {
+        "title": "My Blog",
+        "description": "A personal blog.",
+    }
+}
 
 
 # Logging Configuration

@@ -10,6 +10,21 @@
 	{% block stylesheet_extra %}
 	{% endblock %}
 	<title>{{ CONSTANTS.site.title }}{% block title %}{% endblock %}</title>
+	<meta name="description" content="{% block meta_description %}{{ CONSTANTS.site.description }}{% endblock %}">
+	<link rel="canonical" href="{% block canonical %}{{ request.build_absolute_uri }}{% endblock %}">
+	<meta property="og:site_name" content="{{ CONSTANTS.site.title }}">
+	{% block og_tags %}
+	<meta property="og:title" content="{{ CONSTANTS.site.title }}">
+	<meta property="og:description" content="{{ CONSTANTS.site.description }}">
+	<meta property="og:url" content="{{ request.build_absolute_uri }}">
+	<meta property="og:type" content="website">
+	{% endblock %}
+	{% block twitter_tags %}
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="{{ CONSTANTS.site.title }}">
+	<meta name="twitter:description" content="{{ CONSTANTS.site.description }}">
+	{% endblock %}
+	{% if namespace %}<link rel="alternate" type="application/rss+xml" title="{{ CONSTANTS.site.title }} RSS Feed" href="{% url 'feed' namespace %}">{% endif %}
 	{% include "includes/header.html" %}
 	{% if author %}{% for link in author.rel_me_links.all %}
 	<link rel="me" href="{{ link.url }}">

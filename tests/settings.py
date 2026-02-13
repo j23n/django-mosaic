@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "django.contrib.sitemaps",
     "markdownify.apps.MarkdownifyConfig",
     "django_magic_authorization",
     "django_mosaic",
