@@ -17,6 +17,10 @@ from django.core.files.base import ContentFile
 logger = logging.getLogger("django_mosaic")
 
 
+def generate_secret_id():
+    return secrets.token_hex(32)
+
+
 class Namespace(models.Model):
     name = models.SlugField(max_length=256, unique=True, blank=False, null=False)
 
@@ -108,7 +112,7 @@ class ContentImage(models.Model):
 
 class Post(models.Model):
     author = models.ForeignKey(Author, on_delete=models.PROTECT)
-    title = models.CharField(max_length=512, blank=False, null=False, unique=True)
+    title = models.CharField(max_length=512, blank=False, null=False)
     content = models.TextField()
     slug = models.SlugField(max_length=256, blank=True, null=False, unique=True)
     summary = models.CharField(max_length=1024, null=False, blank=True)
@@ -125,21 +129,39 @@ class Post(models.Model):
     changed_at = models.DateTimeField(auto_now=True, blank=False, null=False)
 
     secret_id = models.CharField(
-        max_length=128, blank=False, null=False, default=lambda: secrets.token_hex(32)
+        max_length=128,
+        blank=False,
+        null=False,
+        unique=True,
+        default=generate_secret_id,
     )
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        extra = set()
+
         # no longer update the slug once it's been published
         if not self.is_published and not self.slug:
-            self.slug = slugify(self.title)
+            base = slugify(self.title)[:246]
+            slug = base
+            n = 2
+            while Post.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base}-{n}"
+                n += 1
+            self.slug = slug
+            extra.add("slug")
         if not self.summary:
             self.summary = bleach.clean(
                 markdown.markdown(self.content), strip=True, tags={}
             )[:200]
+            extra.add("summary")
         if self.is_published and not self.published_at:
             self.published_at = django.utils.timezone.now()
-        elif not self.is_published:
-            self.published_at = None
+            extra.add("published_at")
+
+        if update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | extra
+
         return super().save(*args, **kwargs)
 
     def get_absolute_url(self):
