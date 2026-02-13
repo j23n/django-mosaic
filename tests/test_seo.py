@@ -129,6 +129,37 @@ class PostDetailWithImageTest(SEOTestBase):
         resp = self.client.get(self.post.get_absolute_url())
         self.assertContains(resp, '<meta name="twitter:image"')
 
+    def test_featured_image_used_for_og_image(self):
+        ContentImage.objects.create(
+            post=self.post, image=self._create_image(), alt="regular"
+        )
+        featured = ContentImage.objects.create(
+            post=self.post, image=self._create_image(), alt="featured", is_featured=True
+        )
+        resp = self.client.get(self.post.get_absolute_url())
+        self.assertContains(resp, featured.image.url)
+
+    def test_featured_image_used_for_twitter_image(self):
+        ContentImage.objects.create(
+            post=self.post, image=self._create_image(), alt="regular"
+        )
+        featured = ContentImage.objects.create(
+            post=self.post, image=self._create_image(), alt="featured", is_featured=True
+        )
+        resp = self.client.get(self.post.get_absolute_url())
+        content = resp.content.decode()
+        self.assertIn(featured.image.url, content)
+
+    def test_fallback_to_first_image_when_no_featured(self):
+        first = ContentImage.objects.create(
+            post=self.post, image=self._create_image(), alt="first"
+        )
+        ContentImage.objects.create(
+            post=self.post, image=self._create_image(), alt="second"
+        )
+        resp = self.client.get(self.post.get_absolute_url())
+        self.assertContains(resp, first.image.url)
+
 
 class HomepageMetaTest(SEOTestBase):
     def setUp(self):

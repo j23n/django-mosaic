@@ -68,6 +68,7 @@ class ContentImage(models.Model):
     )
     caption = models.CharField(max_length=2048, null=False, blank=True, default="")
     alt = models.CharField(max_length=2048, null=False, blank=True, default="")
+    is_featured = models.BooleanField(default=False)
     post = models.ForeignKey("Post", on_delete=models.CASCADE)
 
     def __str__(self):
@@ -182,6 +183,10 @@ class Post(models.Model):
             kwargs["update_fields"] = set(update_fields) | extra
 
         return super().save(*args, **kwargs)
+
+    @property
+    def featured_image(self):
+        return self.contentimage_set.filter(is_featured=True).first() or self.contentimage_set.first()
 
     def get_absolute_url(self):
         if self.is_published:

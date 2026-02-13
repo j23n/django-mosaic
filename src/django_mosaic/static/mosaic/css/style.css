@@ -550,6 +550,9 @@ img {
   display:block;
   border-radius:var(--image-radius)
 }
+[hidden] {
+  display:none !important
+}
 desaturate {
   filter:grayscale(100%)
 }

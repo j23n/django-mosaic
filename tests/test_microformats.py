@@ -73,6 +73,29 @@ class PostDetailUPhotoTest(HEntryTestBase):
         self.assertIn('class="u-photo"', content)
         self.assertIn('alt="Test photo"', content)
 
+    def test_u_photo_uses_featured_image(self):
+        ContentImage.objects.create(
+            post=self.post, image=self._make_image(), alt="Regular photo"
+        )
+        ContentImage.objects.create(
+            post=self.post, image=self._make_image(), alt="Featured photo", is_featured=True
+        )
+        resp = self.client.get(self.post.get_absolute_url())
+        content = resp.content.decode()
+        self.assertIn('class="u-photo"', content)
+        self.assertIn('alt="Featured photo"', content)
+
+    def test_u_photo_fallback_to_first_image(self):
+        ContentImage.objects.create(
+            post=self.post, image=self._make_image(), alt="First photo"
+        )
+        ContentImage.objects.create(
+            post=self.post, image=self._make_image(), alt="Second photo"
+        )
+        resp = self.client.get(self.post.get_absolute_url())
+        content = resp.content.decode()
+        self.assertIn('alt="First photo"', content)
+
 
 class HFeedTestBase(TestCase):
     @classmethod

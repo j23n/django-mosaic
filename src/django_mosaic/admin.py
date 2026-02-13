@@ -8,7 +8,7 @@ from django_mosaic.models import Post, Tag, ContentImage, Author, RelMeLink
 class ContentImageInlineAdmin(admin.TabularInline):
     model = ContentImage
     readonly_fields = ["thumb", "thumbnail_preview", "copy_markdown_button"]
-    fields = ["image", "thumbnail_preview", "caption", "alt", "copy_markdown_button"]
+    fields = ["image", "thumbnail_preview", "caption", "alt", "is_featured", "copy_markdown_button"]
 
     def thumbnail_preview(self, obj):
         if obj.thumb:
