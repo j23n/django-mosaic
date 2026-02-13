@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% load markdownify %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3/dist/css/glightbox.min.css">
+{% endblock %}
+
 {% block title %} - {{ post.title }}{% endblock %}
 {% block meta_description %}{{ post.summary }}{% endblock %}
 {% block canonical %}{{ request.scheme }}://{{ request.get_host }}{{ post.get_absolute_url }}{% endblock %}
@@ -54,4 +58,12 @@ by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.userna
 <div class="prev">{% if prev_post %}Previous: <a href="{{ prev_post.get_absolute_url }}" class="muted">{{ prev_post.title|truncatechars:20 }}</a>{% else %}This was the last post{% endif %}</div>
 <div class="next">{% if next_post %}Next: <a href="{{ next_post.get_absolute_url }}" class="muted">{{ next_post.title|truncatechars:20 }}</a>{% else %}None yet :-){% endif %}</div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/glightbox@3/dist/js/glightbox.min.js"></script>
+<script>
+document.querySelectorAll('.e-content figcaption').forEach(fc => {
+    const a = fc.parentElement.querySelector('a');
+    if (a) a.dataset.description = fc.textContent;
+});
+GLightbox({ selector: '.e-content a', touchNavigation: true, loop: true });
+</script>
 {% endblock %}

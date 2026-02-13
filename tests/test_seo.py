@@ -75,6 +75,20 @@ class PostDetailMetaTest(SEOTestBase):
         self.assertContains(self.resp, self.post.get_absolute_url())
 
 
+class PostDetailLightboxTest(SEOTestBase):
+    def setUp(self):
+        self.resp = self.client.get(self.post.get_absolute_url())
+
+    def test_glightbox_css_loaded(self):
+        self.assertContains(self.resp, "glightbox.min.css")
+
+    def test_glightbox_js_loaded(self):
+        self.assertContains(self.resp, "glightbox.min.js")
+
+    def test_glightbox_targets_content_links(self):
+        self.assertContains(self.resp, "selector: '.e-content a'")
+
+
 class PostDetailTwitterCardTest(SEOTestBase):
     def setUp(self):
         self.resp = self.client.get(self.post.get_absolute_url())
