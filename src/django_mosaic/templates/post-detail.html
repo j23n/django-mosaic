@@ -32,14 +32,14 @@
 Written on
 <time class="dt-published" datetime="{{ post.published_at|date:'c' }}">{{ post.published_at|date:'Y-m-d' }}</time>
 by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.username }}</a>
-{% if post.tags %} in {% for t in post.tags.all %}<a class="p-category" href={{ t.get_absolute_url }}>{{ t.name }}</a> {% endfor %}{% endif %}
+{% if post.tags %} in {% for t in post.tags.all %}<a class="p-category" href="{{ t.get_absolute_url }}">{{ t.name }}</a> {% endfor %}{% endif %}
 </small>
 </hgroup>
 <a class="u-url" href="{{ post.get_absolute_url }}" hidden></a>
 {% if post.featured_image %}
 <img class="u-photo" src="{{ post.featured_image.image.url }}" alt="{{ post.featured_image.alt }}" hidden>
 {% endif %}
-<div class="e-summary" hidden="true">
+<div class="e-summary" hidden>
 {{ post.summary }}
 </div>
 <div class="e-content">
@@ -51,7 +51,7 @@ by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.userna
 <hr>
 
 <div class="post-nav">
-<div class="prev">Previous: <a href="{{ prev_post.get_absolute_url }}" class="muted">{{ prev_post.title|truncatechars:20|default:"This was the last post" }}</a></div>
-<div class="next">Next: <a href="{{ next_post.get_absolute_url }}" class="muted">{{ next_post.title|truncatechars:20|default:"None yet :-)" }}</a></div>
+<div class="prev">{% if prev_post %}Previous: <a href="{{ prev_post.get_absolute_url }}" class="muted">{{ prev_post.title|truncatechars:20 }}</a>{% else %}This was the last post{% endif %}</div>
+<div class="next">{% if next_post %}Next: <a href="{{ next_post.get_absolute_url }}" class="muted">{{ next_post.title|truncatechars:20 }}</a>{% else %}None yet :-){% endif %}</div>
 </div>
 {% endblock %}

@@ -9,7 +9,6 @@ from django_mosaic.views import (
     post_detail,
     draft_detail,
     home,
-    about,
     tag_detail,
     robots_txt,
 )

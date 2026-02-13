@@ -9,7 +9,7 @@ def _get_posts(namespace="public"):
 
 def home(request, namespace="public"):
     posts = _get_posts(namespace)
-    tags = Tag.objects.filter(post__in=posts).distinct()
+    tags = Tag.objects.filter(post__in=posts).distinct().order_by("name")
 
     return render(
         request,
@@ -76,10 +76,6 @@ def tag_detail(request, namespace, name):
         "tag-detail.html",
         {"posts": posts, "tag": tag, "CONSTANTS": settings.CONSTANTS, "namespace": namespace},
     )
-
-
-def about(request):
-    return render(request, "about.html")
 
 
 def robots_txt(request):
