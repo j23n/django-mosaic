@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.db import models
 from django import forms
 from django.utils.html import format_html
-from django_mosaic.models import Post, Tag, ContentImage
+from django_mosaic.models import Post, Tag, ContentImage, Author, RelMeLink
 
 
 class ContentImageInlineAdmin(admin.TabularInline):
@@ -72,6 +72,42 @@ class TagAdmin(admin.ModelAdmin):
     pass
 
 
+class RelMeLinkInline(admin.TabularInline):
+    model = RelMeLink
+    extra = 1
+
+
+class AuthorAdmin(admin.ModelAdmin):
+    fieldsets = [
+        (
+            "Public h-card",
+            {
+                "description": (
+                    "These fields are rendered as your public h-card on the homepage."
+                ),
+                "fields": [
+                    "user",
+                    "display_name",
+                    "url",
+                    "email",
+                    "photo_url",
+                    "note",
+                ],
+            },
+        ),
+        (
+            "Advanced",
+            {
+                "classes": ["collapse"],
+                "fields": ["h_card"],
+            },
+        ),
+    ]
+    inlines = [RelMeLinkInline]
+
+
 admin.site.register(Post, PostAdmin)
 admin.site.register(Tag, TagAdmin)
 admin.site.register(ContentImage, ContentImageAdmin)
+admin.site.register(Author, AuthorAdmin)
+admin.site.register(RelMeLink)

@@ -33,13 +33,32 @@ class Namespace(models.Model):
 
 class Author(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    h_card = models.JSONField()
+    h_card = models.JSONField(default=dict, blank=True)
+    display_name = models.CharField(max_length=256, blank=True, default="")
+    url = models.URLField(max_length=512, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    photo_url = models.URLField(max_length=512, blank=True, default="")
+    note = models.CharField(max_length=1024, blank=True, default="")
 
     def __str__(self):
         return self.user.username
 
     def __repr__(self):
         return f"<Author {self.user.username}>"
+
+
+class RelMeLink(models.Model):
+    author = models.ForeignKey(
+        Author, on_delete=models.CASCADE, related_name="rel_me_links"
+    )
+    url = models.URLField(max_length=512)
+    label = models.CharField(max_length=256, blank=True, default="")
+
+    class Meta:
+        ordering = ["pk"]
+
+    def __str__(self):
+        return self.label or self.url
 
 
 class ContentImage(models.Model):

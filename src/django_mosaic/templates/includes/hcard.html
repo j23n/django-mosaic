@@ -1,0 +1,17 @@
+{% if author %}
+<div class="h-card next">
+	{% if author.photo_url %}<img class="u-photo" hidden src="{{ author.photo_url }}" alt="{{ author.display_name }}">{% endif %}
+	{% if author.url and author.display_name %}<a class="p-name u-url muted" href="{{ author.url }}">{{ author.display_name }}</a>
+	{% elif author.display_name %}<span class="p-name">{{ author.display_name }}</span>
+	{% elif author.url %}<a class="u-url muted" href="{{ author.url }}">{{ author.url }}</a>
+	{% endif %}
+	{% if author.note %}<p class="p-note">{{ author.note }}</p>{% endif %}
+	{% if author.email %}<a class="u-email muted" href="mailto:{{ author.email }}">{{ author.email }}</a>{% endif %}
+	{% if author.rel_me_links.all %}
+	<br>
+	{% for link in author.rel_me_links.all %}
+	<a rel="me" class="muted" href="{{ link.url }}">{{ link.label|default:link.url }}</a>{% if not forloop.last %} · {% endif %}
+	{% endfor %}
+	{% endif %}
+</div>
+{% endif %}
