@@ -54,6 +54,12 @@ explicit = true
 [dependency-groups]
 dev = [
     "black>=26.1.0",
+    "pytest>=9.0.2",
+    "pytest-django>=4.11.1",
     "ruff>=0.14.13",
     "ty>=0.0.12",
 ]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+pythonpath = ["src", "."]

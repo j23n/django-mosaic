@@ -13,7 +13,7 @@ class PostFeed(Feed):
         return Namespace.objects.get(name=namespace)
 
     def items(self, obj):
-        return Post.objects.filter(namespace=obj)
+        return Post.objects.filter(namespace=obj, is_published=True)
 
     def item_title(self, item):
         return item.title

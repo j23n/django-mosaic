@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "markdownify.apps.MarkdownifyConfig",
     "django_magic_authorization",
     "django_mosaic",
 ]
@@ -29,6 +30,13 @@ DATABASES = {
 }
 
 USE_TZ = True
+
+CONSTANTS = {
+    "site": {
+        "title": "Test Blog",
+        "description": "A test blog.",
+    }
+}
 
 # Required for URL resolution
 ROOT_URLCONF = "tests.urls"
@@ -43,6 +51,7 @@ MIDDLEWARE = [
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "tests" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [

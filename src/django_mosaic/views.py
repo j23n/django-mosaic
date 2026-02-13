@@ -26,17 +26,23 @@ def post_list(request, namespace):
 
 
 def post_detail(request, namespace, year, post_slug):
-    post = get_object_or_404(Post, slug=post_slug)
+    post = get_object_or_404(
+        Post, slug=post_slug, namespace__name=namespace, is_published=True
+    )
 
     next_post = (
         Post.objects.filter(
-            namespace=post.namespace, published_at__gt=post.published_at
+            namespace=post.namespace,
+            is_published=True,
+            published_at__gt=post.published_at,
         )
         .reverse()
         .first()
     )
     prev_post = Post.objects.filter(
-        namespace=post.namespace, published_at__lt=post.published_at
+        namespace=post.namespace,
+        is_published=True,
+        published_at__lt=post.published_at,
     ).first()
 
     return render(
