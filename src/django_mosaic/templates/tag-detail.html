@@ -2,7 +2,7 @@
 
 {% block content %}
 <h2>Posts for <strong>{{ tag.name }}</strong></h2>
-<ul>
+<ul class="h-feed">
 {% for post in posts %}
 {% include "post-detail-include.html" %}
 {% endfor %}

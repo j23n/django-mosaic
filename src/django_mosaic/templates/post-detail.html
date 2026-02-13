@@ -30,11 +30,15 @@
 <h1 class="p-name">{{ post.title }}</h1>
 <small>
 Written on
-<time class="dt-published" datetime="{{ post.published_at|date:'Y-m-d H:i:s' }}">{{ post.published_at|date:'Y-m-d' }}</time>
+<time class="dt-published" datetime="{{ post.published_at|date:'c' }}">{{ post.published_at|date:'Y-m-d' }}</time>
 by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.username }}</a>
-{% if post.tags %} in {% for t in post.tags.all %}<a href={{ t.get_absolute_url }}>{{ t.name }}</a> {% endfor %}{% endif %}
+{% if post.tags %} in {% for t in post.tags.all %}<a class="p-category" href={{ t.get_absolute_url }}>{{ t.name }}</a> {% endfor %}{% endif %}
 </small>
 </hgroup>
+<a class="u-url" href="{{ post.get_absolute_url }}" hidden></a>
+{% if post.contentimage_set.first %}
+<img class="u-photo" src="{{ post.contentimage_set.first.image.url }}" alt="{{ post.contentimage_set.first.alt }}" hidden>
+{% endif %}
 <div class="e-summary" hidden="true">
 {{ post.summary }}
 </div>

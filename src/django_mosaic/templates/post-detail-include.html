@@ -1,1 +1,1 @@
-<li><a href="{{ post.get_absolute_url }}" class="plain"><code class="meta">{{ post.published_at | date:"Y-m-d" }}</code> {{ post.title }}</a></li>
+<li class="h-entry"><a class="u-url plain" href="{{ post.get_absolute_url }}"><time class="dt-published" datetime="{{ post.published_at|date:'c' }}"><code class="meta">{{ post.published_at|date:'Y-m-d' }}</code></time> <span class="p-name">{{ post.title }}</span></a></li>
