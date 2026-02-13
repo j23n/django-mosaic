@@ -10,6 +10,7 @@ import django.utils.timezone
 from django.utils.text import slugify
 from django.urls import reverse
 from django.db import models
+from django.utils.html import format_html
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 
@@ -89,9 +90,19 @@ class ContentImage(models.Model):
             thumb = self.image
 
         if self.caption:
-            return f"<figure><a href='{self.image.url}'><img src='{thumb.url}' alt='{self.alt}'></a><figcaption>{self.caption}</figcaption></figure>"
-        return (
-            f"<a href='{self.image.url}'><img src='{thumb.url}' alt='{self.alt}'></a>"
+            return format_html(
+                "<figure><a href='{}'><img src='{}' alt='{}'></a>"
+                "<figcaption>{}</figcaption></figure>",
+                self.image.url,
+                thumb.url,
+                self.alt,
+                self.caption,
+            )
+        return format_html(
+            "<a href='{}'><img src='{}' alt='{}'></a>",
+            self.image.url,
+            thumb.url,
+            self.alt,
         )
 
 

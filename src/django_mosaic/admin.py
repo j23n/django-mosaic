@@ -30,7 +30,7 @@ class ContentImageInlineAdmin(admin.TabularInline):
                 'data-markdown="{}">'
                 "Copy Markdown"
                 "</button>",
-                markdown_text.replace('"', "&quot;"),
+                markdown_text,
             )
         return ""
 

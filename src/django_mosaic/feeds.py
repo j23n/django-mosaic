@@ -1,6 +1,8 @@
 from django.contrib.syndication.views import Feed
 from django.conf import settings
 
+from markdownify.templatetags.markdownify import markdownify
+
 from django_mosaic.models import Post, Namespace
 
 
@@ -19,7 +21,7 @@ class PostFeed(Feed):
         return item.title
 
     def item_description(self, item):
-        return item.content
+        return markdownify(item.content)
 
     def item_pubdate(self, item):
         return item.published_at
