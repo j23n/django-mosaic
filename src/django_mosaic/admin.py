@@ -1,6 +1,7 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import models
 from django import forms
+from django.urls import reverse
 from django.utils.html import format_html
 from django_mosaic.models import Post, Tag, ContentImage, Author, RelMeLink
 
@@ -38,16 +39,18 @@ class ContentImageInlineAdmin(admin.TabularInline):
 
 
 class PostAdmin(admin.ModelAdmin):
-    readonly_fields = ["created_at"]
+    readonly_fields = ["created_at", "draft_preview_link"]
     list_display = [
         "title",
         "is_published",
+        "has_draft_indicator",
         "published_at",
         "namespace",
         "get_tags",
         "changed_at",
     ]
     list_filter = ["is_published", "namespace", "tags", "published_at"]
+    actions = ["publish_draft"]
 
     formfield_overrides = {
         models.TextField: {
@@ -61,6 +64,46 @@ class PostAdmin(admin.ModelAdmin):
 
     def get_tags(self, obj):
         return ", ".join([t.name for t in obj.tags.all()])
+
+    def has_draft_indicator(self, obj):
+        return "Draft pending" if obj.has_draft else ""
+
+    has_draft_indicator.short_description = "Draft"
+
+    def draft_preview_link(self, obj):
+        if not obj.pk:
+            return ""
+        if obj.has_draft:
+            url = reverse("draft-detail", args=[obj.namespace.name, obj.secret_id])
+            return format_html('<a href="{}" target="_blank">Preview draft</a>', url)
+        return "No draft pending"
+
+    draft_preview_link.short_description = "Draft preview"
+
+    @admin.action(description="Publish draft content")
+    def publish_draft(self, request, queryset):
+        published = 0
+        skipped = 0
+        for post in queryset:
+            if post.has_draft:
+                post.content = post.draft_content
+                post.draft_content = None
+                post.save(update_fields=["content", "draft_content"])
+                published += 1
+            else:
+                skipped += 1
+        if published:
+            self.message_user(
+                request,
+                f"Published draft content for {published} post(s).",
+                messages.SUCCESS,
+            )
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped {skipped} post(s) with no draft content.",
+                messages.WARNING,
+            )
 
 
 class ContentImageAdmin(admin.ModelAdmin):

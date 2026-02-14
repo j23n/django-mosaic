@@ -294,14 +294,14 @@ wheels = [
 
 [[package]]
 name = "django-magic-authorization"
-version = "0.1.5"
+version = "0.1.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bf/63/86731d822b737b54c242fd0be7370a2beca00b1725780246e132505b2d5a/django_magic_authorization-0.1.5.tar.gz", hash = "sha256:a29906bcd1e6f674804ecb78aa44aa54d964ecb24344d4cf881178be78c6e4f1", size = 6245, upload-time = "2026-02-02T13:22:08.944Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/e7/b2be29c4319903f9a591df28dfb88678a2f5a1afe9b4dc009016967310cf/django_magic_authorization-0.1.6.tar.gz", hash = "sha256:4ef7f16ea99effc4d805301e55e270737ea391493af87395a09ece0885dbd193", size = 9911, upload-time = "2026-02-13T07:42:53.525Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a7/4a/8c816ac4b9bffe000831840683ce84f477e3ce9fc8e57da0f491cb2a29c2/django_magic_authorization-0.1.5-py3-none-any.whl", hash = "sha256:ecfa1db8852bf2d7d67dd5c8ebc1d841281e854f7afb53a2e35c29df924efcc3", size = 8815, upload-time = "2026-02-02T13:22:07.878Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/79/a5f1245209e9e6ca535eac8bf9b0d3f96918a699c6808c1d6a1082f9ef56/django_magic_authorization-0.1.6-py3-none-any.whl", hash = "sha256:650b3202d0e14ee897fb2b7a7d55bce9887152a6e18e115a4550ba0561d0c4db", size = 15364, upload-time = "2026-02-13T07:42:50.827Z" },
 ]
 
 [[package]]
@@ -320,7 +320,7 @@ wheels = [
 
 [[package]]
 name = "django-mosaic"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "bleach" },
@@ -344,7 +344,7 @@ dev = [
 requires-dist = [
     { name = "bleach", specifier = ">=6.3.0" },
     { name = "django", specifier = ">=5.2.11" },
-    { name = "django-magic-authorization", specifier = ">=0.1.5" },
+    { name = "django-magic-authorization", specifier = ">=0.1.6" },
     { name = "django-markdownify", specifier = ">=0.9.6" },
     { name = "fabric", specifier = ">=3.2.2" },
     { name = "pillow", specifier = ">=12.1.0" },

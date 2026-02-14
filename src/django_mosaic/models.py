@@ -134,6 +134,7 @@ class Post(models.Model):
     author = models.ForeignKey(Author, on_delete=models.PROTECT)
     title = models.CharField(max_length=512, blank=False, null=False)
     content = models.TextField()
+    draft_content = models.TextField(blank=True, null=True, default=None)
     slug = models.SlugField(max_length=256, blank=True, null=False, unique=True)
     summary = models.CharField(max_length=1024, null=False, blank=True)
 
@@ -183,6 +184,10 @@ class Post(models.Model):
             kwargs["update_fields"] = set(update_fields) | extra
 
         return super().save(*args, **kwargs)
+
+    @property
+    def has_draft(self):
+        return self.draft_content is not None
 
     @property
     def featured_image(self):

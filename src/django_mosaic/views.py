@@ -59,9 +59,15 @@ def post_detail(request, namespace, year, post_slug):
 def draft_detail(request, namespace, secret_id):
     post = get_object_or_404(Post, secret_id=secret_id)
 
-    return render(
-        request, "post-detail.html", {"post": post}
+    display_content = post.draft_content if post.draft_content is not None else post.content
+
+    response = render(
+        request,
+        "post-detail.html",
+        {"post": post, "display_content": display_content, "is_draft": True, "namespace": namespace},
     )
+    response["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 def tag_detail(request, namespace, name):

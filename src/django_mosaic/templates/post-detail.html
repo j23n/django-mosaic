@@ -29,6 +29,9 @@
 {% endblock %}
 
 {% block content %}
+{% if is_draft %}
+<div class="draft-banner"><strong>Draft preview</strong> — this content has not been published.</div>
+{% endif %}
 <article class="h-entry">
 <hgroup>
 <h1 class="p-name">{{ post.title }}</h1>
@@ -47,7 +50,7 @@ by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.userna
 {{ post.summary }}
 </div>
 <div class="e-content">
-{{ post.content|markdownify }}
+{{ display_content|default:post.content|markdownify }}
 </div>
 
 </article>
