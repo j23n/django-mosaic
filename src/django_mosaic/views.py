@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404
-from django_mosaic.models import Post, Tag
+from django_mosaic.models import Post, Tag, ContentImage
 
 
 def _get_posts(namespace="public"):
@@ -70,15 +70,16 @@ def draft_detail(request, namespace, secret_id):
     return response
 
 
-def tag_detail(request, namespace, name):
-    tag = get_object_or_404(Tag, name=name, namespace__name=namespace)
+def tag_detail(request, namespace, slug):
+    tag = get_object_or_404(Tag, slug=slug, namespace__name=namespace)
 
     posts = _get_posts(namespace).filter(tags=tag)
+    images = ContentImage.objects.filter(post__in=posts).select_related("post")
 
     return render(
         request,
-        "tag-detail.html",
-        {"posts": posts, "tag": tag, "namespace": namespace},
+        [f"tags/{tag.slug}.html", "tag-detail.html"],
+        {"posts": posts, "tag": tag, "images": images, "namespace": namespace},
     )
 
 
