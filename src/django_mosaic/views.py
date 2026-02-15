@@ -12,7 +12,7 @@ def home(request, namespace="public"):
 
     return render(
         request,
-        "home.html",
+        [f"home-{namespace}.html", "home.html"],
         {"posts": posts, "tags": tags, "namespace": namespace},
     )
 
