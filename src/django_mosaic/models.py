@@ -215,12 +215,18 @@ class Post(models.Model):
 
 class Tag(models.Model):
     name = models.CharField(max_length=256, blank=False, null=False)
+    slug = models.SlugField(max_length=256, blank=True, null=False)
     namespace = models.ForeignKey(
         "Namespace", on_delete=models.PROTECT, null=False, blank=False
     )
 
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)[:256]
+        super().save(*args, **kwargs)
+
     def get_absolute_url(self):
-        return reverse("tag-detail", args=[self.namespace.name, self.name])
+        return reverse("tag-detail", args=[self.namespace.name, self.slug])
 
     def __str__(self):
         return f"{self.name} ({self.namespace.name})"

@@ -17,7 +17,7 @@ from django_mosaic.sitemaps import PostSitemap
 
 mosaic_patterns = [
     path("", home, name="ns-home"),
-    path("tag/<str:name>", tag_detail, name="tag-detail"),
+    path("tag/<slug:slug>", tag_detail, name="tag-detail"),
     path("posts", post_list, name="post-list"),
     path("posts/<int:year>/<str:post_slug>", post_detail, name="post-detail"),
     path("feed", PostFeed(), name="feed"),
