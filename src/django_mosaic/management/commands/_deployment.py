@@ -3,6 +3,7 @@ Deployment handler for mosaic blog.
 
 This module is called via the mosaic command:
     python manage.py mosaic deployment setup
+    python manage.py mosaic deployment update
     python manage.py mosaic deployment status
 
 Not meant to be called directly.
@@ -20,6 +21,7 @@ Design decisions:
 from django.core.management.utils import get_random_secret_key
 from django.conf import settings as django_settings
 from fabric import Connection
+from rich.table import Table
 import subprocess
 import tempfile
 import os
@@ -53,16 +55,14 @@ HEALTH_CHECK_TIMEOUT = 5
 class DeploymentHandler:
     """Handles deployment operations for mosaic blog"""
 
-    def __init__(self, stdout, style):
+    def __init__(self, console):
         """
         Initialize deployment handler.
 
         Args:
-            stdout: Output stream for writing messages
-            style: Django command style object for colored output
+            console: rich.console.Console instance for styled output
         """
-        self.stdout = stdout
-        self.style = style
+        self.console = console
 
     # =========================================================================
     # UTILITIES
@@ -99,8 +99,8 @@ class DeploymentHandler:
     def _run(self, conn, cmd, description=None, **kwargs):
         """Execute conn.run() with display and confirmation"""
         if description and self.explain_mode:
-            self.stdout.write(f"\n{description}")
-        self.stdout.write(f"  $ {cmd}")
+            self.console.print(f"\n{description}")
+        self.console.print(f"  $ {cmd}", style="dim")
 
         if not self.auto_mode:
             response = input("  Execute? [Y/n]: ").strip()
@@ -115,8 +115,8 @@ class DeploymentHandler:
     def _sudo(self, conn, cmd, description=None, **kwargs):
         """Execute conn.sudo() with display and confirmation"""
         if description and self.explain_mode:
-            self.stdout.write(f"\n{description}")
-        self.stdout.write(self.style.WARNING(f"  $ sudo {cmd}"))
+            self.console.print(f"\n{description}")
+        self.console.print(f"  $ sudo {cmd}", style="bold yellow")
 
         if not self.auto_mode:
             response = input("  Execute? [Y/n]: ").strip()
@@ -131,12 +131,12 @@ class DeploymentHandler:
     def _put(self, conn, local_path, remote_path, description=None):
         """Upload file with content display and confirmation"""
         if description and self.explain_mode:
-            self.stdout.write(f"\n{description}")
+            self.console.print(f"\n{description}")
 
         local_file = Path(local_path)
         file_size = local_file.stat().st_size if local_file.exists() else 0
 
-        self.stdout.write(f"  📤 {local_path} → {remote_path}")
+        self.console.print(f"  {local_path} -> {remote_path}")
 
         # Show content for non-archive files
         if not remote_path.endswith((".tar.gz", ".tar", ".zip", ".tgz")):
@@ -144,18 +144,18 @@ class DeploymentHandler:
                 with open(local_path, "r") as f:
                     content = f.read()
 
-                self.stdout.write(self.style.SUCCESS("\n  Content:"))
-                self.stdout.write("  " + "─" * 70)
+                self.console.print("\n  Content:", style="green")
+                self.console.print("  " + "-" * 70)
                 for i, line in enumerate(content.split("\n"), 1):
-                    self.stdout.write(f"  {i:3d} | {line}")
-                self.stdout.write("  " + "─" * 70)
+                    self.console.print(f"  {i:3d} | {line}")
+                self.console.print("  " + "-" * 70)
             except (UnicodeDecodeError, IsADirectoryError):
                 # Binary file
-                self.stdout.write(f"  (Binary file, {file_size} bytes)")
+                self.console.print(f"  (Binary file, {file_size} bytes)")
         else:
             # Archive - just show size
             size_mb = file_size / (1024 * 1024)
-            self.stdout.write(f"  (Archive, {size_mb:.1f} MB)")
+            self.console.print(f"  (Archive, {size_mb:.1f} MB)")
 
         if not self.auto_mode:
             response = input("  Upload? [Y/n]: ").strip()
@@ -189,7 +189,8 @@ class DeploymentHandler:
 
     def run_setup(self, options):
         """Main setup flow - interactive deployment"""
-        self.stdout.write(self.style.SUCCESS("=== Mosaic Deployment Helper ===\n"))
+        self.console.rule("[bold]Mosaic Deployment Setup")
+        self.console.print()
 
         # Set mode flags
         self.auto_mode = options.get("auto", False)
@@ -197,8 +198,8 @@ class DeploymentHandler:
         self.dry_run = options.get("dry_run", False)
 
         if self.dry_run:
-            self.stdout.write(
-                self.style.WARNING("🔍 Dry run mode: no commands will be executed\n")
+            self.console.print(
+                "[yellow]  Dry run mode: no commands will be executed[/yellow]\n"
             )
 
         conn = None
@@ -206,7 +207,7 @@ class DeploymentHandler:
 
         try:
             # Step 1: Gather configuration
-            config = config_manager.get_config(stdout=self.stdout)
+            config = config_manager.get_config(stdout=None)
 
             # Store config as instance variable for use in helper methods
             # This avoids passing config to every method and provides single source of truth
@@ -216,98 +217,186 @@ class DeploymentHandler:
             config["secret_key"] = get_random_secret_key()
 
             # Step 2: Test SSH connection
-            self.stdout.write("\n📡 Testing SSH connection...")
+            self.console.rule("[bold]Testing SSH Connection")
             try:
                 conn = self.test_ssh_connection()
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"  ✗ Failed: {str(e)}"))
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
                 return
 
             # Step 3: Install system dependencies
-            self.stdout.write("\n📦 Installing system dependencies...")
+            self.console.rule("[bold]Installing System Dependencies")
             try:
                 self.install_system_dependencies(conn)
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"  ✗ Failed: {str(e)}"))
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
                 return
 
             # Step 4: Configure firewall
-            self.stdout.write("\n🔥 Configuring firewall...")
+            self.console.rule("[bold]Configuring Firewall")
             try:
                 self.setup_firewall(conn)
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"  ✗ Failed: {str(e)}"))
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
                 return
 
             # Step 5: Transfer project files to VPS
-            self.stdout.write("\n📦 Transferring project files...")
+            self.console.rule("[bold]Transferring Project Files")
             try:
                 self.transfer_project_files(conn)
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"  ✗ Failed: {str(e)}"))
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
                 return
 
             # Step 6: Build Docker image on VPS
-            self.stdout.write("\n🐳 Building Docker image on VPS...")
+            self.console.rule("[bold]Building Docker Image")
             try:
                 self.build_docker_image_remote(conn)
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"  ✗ Failed: {str(e)}"))
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
                 return
 
             # Step 7: Generate and upload configuration files
-            self.stdout.write("\n⚙️  Setting up configuration...")
+            self.console.rule("[bold]Setting Up Configuration")
             try:
                 self.setup_configuration(conn)
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"  ✗ Failed: {str(e)}"))
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
                 return
 
             # Step 8: Create systemd services
-            self.stdout.write("\n🔧 Creating systemd services...")
+            self.console.rule("[bold]Creating Systemd Services")
             try:
                 self.setup_systemd_services(conn)
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"  ✗ Failed: {str(e)}"))
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
                 return
 
             # Step 9: Configure nginx
-            self.stdout.write("\n🌐 Configuring nginx...")
+            self.console.rule("[bold]Configuring Nginx")
             try:
                 self.setup_nginx(conn)
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"  ✗ Failed: {str(e)}"))
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
                 return
 
             # Step 10: Set up SSL with certbot
-            self.stdout.write("\n🔒 Setting up SSL certificate...")
+            self.console.rule("[bold]Setting Up SSL Certificate")
             try:
                 self.setup_ssl(conn)
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f"  ⚠ Warning: {str(e)}"))
+                self.console.print(f"[yellow]  Warning: {e}[/yellow]")
                 # Continue even if SSL fails - it can be set up later
 
             # Step 11: Start services
-            self.stdout.write("\n🚀 Starting services...")
+            self.console.rule("[bold]Starting Services")
             try:
                 self.start_services(conn)
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"  ✗ Failed: {str(e)}"))
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
                 return
 
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f'\n✅ Deployment complete! Visit https://{self.config["domain"]}'
-                )
+            self.console.print(
+                f'\n[green bold]  Deployment complete! Visit https://{self.config["domain"]}[/green bold]'
             )
 
         except KeyboardInterrupt:
-            self.stdout.write(self.style.WARNING("\n\n⚠ Deployment cancelled by user"))
+            self.console.print("\n[yellow]  Deployment cancelled by user[/yellow]")
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"\n\n✗ Deployment failed: {str(e)}"))
+            self.console.print(f"\n[red]  Deployment failed: {e}[/red]")
         finally:
             if conn:
                 conn.close()
+
+    # =========================================================================
+    # UPDATE COMMAND
+    # =========================================================================
+
+    def run_update(self, options):
+        """Quick update flow - transfer files, rebuild, restart service only"""
+        self.console.rule("[bold]Mosaic Application Update")
+        self.console.print()
+
+        # Set mode flags
+        self.auto_mode = options.get("auto", False)
+        self.explain_mode = options.get("explain", False)
+        self.dry_run = options.get("dry_run", False)
+
+        if self.dry_run:
+            self.console.print(
+                "[yellow]  Dry run mode: no commands will be executed[/yellow]\n"
+            )
+
+        conn = None
+        config_manager = ConfigManager()
+
+        try:
+            # Load config from file (no interactive prompts for fields already saved)
+            config = config_manager.get_config(stdout=None)
+            self.config = config
+
+            # Generate secret key (needed for template rendering)
+            config["secret_key"] = get_random_secret_key()
+
+            # Test SSH connection
+            self.console.rule("[bold]Testing SSH Connection")
+            try:
+                conn = self.test_ssh_connection()
+            except Exception as e:
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
+                return
+
+            # Transfer project files
+            self.console.rule("[bold]Transferring Project Files")
+            try:
+                self.transfer_project_files(conn)
+            except Exception as e:
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
+                return
+
+            # Build Docker image
+            self.console.rule("[bold]Building Docker Image")
+            try:
+                self.build_docker_image_remote(conn)
+            except Exception as e:
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
+                return
+
+            # Restart app service only (not backup timer or nginx)
+            self.console.rule("[bold]Restarting Application")
+            try:
+                self.restart_app_service(conn)
+            except Exception as e:
+                self.console.print(f"[red]  ✗ Failed: {e}[/red]")
+                return
+
+            self.console.print(
+                f'\n[green bold]  Update complete! Visit https://{self.config["domain"]}[/green bold]'
+            )
+
+        except KeyboardInterrupt:
+            self.console.print("\n[yellow]  Update cancelled by user[/yellow]")
+        except Exception as e:
+            self.console.print(f"\n[red]  Update failed: {e}[/red]")
+        finally:
+            if conn:
+                conn.close()
+
+    def restart_app_service(self, conn):
+        """Restart only the app service"""
+        app_name = self.config["app_name"]
+
+        self._sudo(
+            conn,
+            f"systemctl restart {app_name}-app.service",
+            description="Restarting app service",
+        )
+
+        self.console.print("[green]  ✓ Application restarted[/green]")
+
+    # =========================================================================
+    # SHARED DEPLOYMENT METHODS
+    # =========================================================================
 
     def test_ssh_connection(self):
         """Test SSH connection and return Connection object"""
@@ -323,7 +412,7 @@ class DeploymentHandler:
             connect_kwargs=connect_kwargs,
         )
         result = conn.run('echo "Connection successful"', hide=True)
-        self.stdout.write(self.style.SUCCESS(f'  ✓ Connected to {self.config["host"]}'))
+        self.console.print(f'[green]  ✓ Connected to {self.config["host"]}[/green]')
         return conn
 
     def install_system_dependencies(self, conn):
@@ -341,7 +430,7 @@ class DeploymentHandler:
             conn, "systemctl start docker", description="Starting Docker service"
         )
 
-        self.stdout.write(self.style.SUCCESS("\n  ✓ Dependencies installed"))
+        self.console.print("[green]  ✓ Dependencies installed[/green]")
 
     def setup_firewall(self, conn):
         """Configure UFW firewall"""
@@ -367,7 +456,7 @@ class DeploymentHandler:
         # Enable UFW
         self._sudo(conn, "ufw --force enable", description="Enabling UFW firewall")
 
-        self.stdout.write(self.style.SUCCESS("\n  ✓ Firewall configured"))
+        self.console.print("[green]  ✓ Firewall configured[/green]")
 
     def transfer_project_files(self, conn):
         """Transfer project files to VPS"""
@@ -432,7 +521,7 @@ class DeploymentHandler:
         project_root = Path.cwd()
         tar_file = f'/tmp/{self.config["app_name"]}-project.tar.gz'
 
-        self.stdout.write("  Creating project archive...")
+        self.console.print("  Creating project archive...", style="dim")
         subprocess.run(
             [
                 "tar",
@@ -468,7 +557,7 @@ class DeploymentHandler:
         # Cleanup local tar
         os.unlink(tar_file)
 
-        self.stdout.write(self.style.SUCCESS("  ✓ Project files transferred"))
+        self.console.print("[green]  ✓ Project files transferred[/green]")
 
     def build_docker_image_remote(self, conn):
         """
@@ -490,10 +579,10 @@ class DeploymentHandler:
         )
 
         if not self.dry_run and not result.ok:
-            self.stdout.write(self.style.ERROR("\n  ✗ Docker build failed"))
+            self.console.print("[red]  ✗ Docker build failed[/red]")
             raise Exception("Docker build failed")
 
-        self.stdout.write(self.style.SUCCESS("\n  ✓ Docker image built on VPS"))
+        self.console.print("[green]  ✓ Docker image built on VPS[/green]")
 
     def setup_configuration(self, conn):
         """Generate and upload .env and settings.py"""
@@ -545,7 +634,7 @@ class DeploymentHandler:
             )
             if existing_key:
                 self.config["secret_key"] = existing_key
-                self.stdout.write("  ℹ Reusing existing SECRET_KEY")
+                self.console.print("  Reusing existing SECRET_KEY", style="dim")
 
         # Generate .env file
         env_content = self.load_template(".env.template")
@@ -584,7 +673,7 @@ class DeploymentHandler:
         )
         os.unlink(backup_temp)
 
-        self.stdout.write(self.style.SUCCESS("  ✓ Configuration files uploaded"))
+        self.console.print("[green]  ✓ Configuration files uploaded[/green]")
 
     def setup_systemd_services(self, conn):
         """Create systemd service and timer for app and backups"""
@@ -619,7 +708,7 @@ class DeploymentHandler:
         self._sudo(
             conn, "systemctl daemon-reload", description="Reloading systemd daemon"
         )
-        self.stdout.write(self.style.SUCCESS("\n  ✓ Systemd services created"))
+        self.console.print("[green]  ✓ Systemd services created[/green]")
 
     def setup_nginx(self, conn):
         """Configure nginx as reverse proxy"""
@@ -659,13 +748,13 @@ class DeploymentHandler:
             hide=True,
         )
         if not self.dry_run and not result.ok:
-            self.stdout.write(self.style.ERROR("\n  ✗ Nginx configuration test failed"))
+            self.console.print("[red]  ✗ Nginx configuration test failed[/red]")
             raise Exception("Nginx configuration is invalid")
 
         # Reload nginx to apply changes
         self._sudo(conn, "systemctl reload nginx", description="Reloading nginx")
 
-        self.stdout.write(self.style.SUCCESS("  ✓ Nginx configured and reloaded"))
+        self.console.print("[green]  ✓ Nginx configured and reloaded[/green]")
 
     def setup_ssl(self, conn):
         """Set up SSL certificate with certbot"""
@@ -687,12 +776,10 @@ class DeploymentHandler:
         )
         if not self.dry_run:
             if result.ok:
-                self.stdout.write(self.style.SUCCESS("\n  ✓ SSL certificate obtained"))
+                self.console.print("[green]  ✓ SSL certificate obtained[/green]")
             else:
-                self.stdout.write(
-                    self.style.WARNING(
-                        "\n  ⚠ SSL setup failed (you may need to configure DNS first)"
-                    )
+                self.console.print(
+                    "[yellow]  SSL setup failed (you may need to configure DNS first)[/yellow]"
                 )
 
     def start_services(self, conn):
@@ -726,7 +813,7 @@ class DeploymentHandler:
         # Reload nginx
         self._sudo(conn, "systemctl reload nginx", description="Reloading nginx")
 
-        self.stdout.write(self.style.SUCCESS("\n  ✓ Services started"))
+        self.console.print("[green]  ✓ Services started[/green]")
 
     # =========================================================================
     # STATUS COMMAND
@@ -734,7 +821,8 @@ class DeploymentHandler:
 
     def check_status(self, options):
         """Check deployment status on VPS"""
-        self.stdout.write(self.style.SUCCESS("=== Deployment Status ===\n"))
+        self.console.rule("[bold]Deployment Status")
+        self.console.print()
 
         # Set mode flags for status checks (auto mode, no explanations, no dry run)
         self.auto_mode = True
@@ -754,7 +842,7 @@ class DeploymentHandler:
             "domain",
         ]
         config = config_manager.get_config(
-            required_fields=required_fields, stdout=self.stdout
+            required_fields=required_fields, stdout=None
         )
 
         # Store config as instance variable for use in helper methods
@@ -764,37 +852,37 @@ class DeploymentHandler:
             conn = self.test_ssh_connection()
 
             # Check configuration files
-            self.stdout.write("\n📄 Configuration Files:")
+            self.console.rule("[bold]Configuration Files")
             self.check_config_files(conn)
 
             # Check Docker
-            self.stdout.write("\n🐳 Docker:")
+            self.console.rule("[bold]Docker")
             self.check_docker_status(conn)
 
             # Check systemd services
-            self.stdout.write("\n⚙️  Services:")
+            self.console.rule("[bold]Services")
             self.check_services_status(conn)
 
             # Check nginx
-            self.stdout.write("\n🌐 Nginx:")
+            self.console.rule("[bold]Nginx")
             self.check_nginx_status(conn)
 
             # Check application health (includes SSL certificate check)
-            self.stdout.write("\n🏥 Application Health & SSL:")
+            self.console.rule("[bold]Application Health & SSL")
             self.check_application_health(conn)
 
             # Check disk space
-            self.stdout.write("\n💾 Disk Space:")
+            self.console.rule("[bold]Disk Space")
             self.check_disk_status(conn)
 
             # Check last backup
-            self.stdout.write("\n📦 Database Backup:")
+            self.console.rule("[bold]Database Backup")
             self.check_backup_status(conn)
 
             conn.close()
 
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Failed to check status: {e}"))
+            self.console.print(f"[red]Failed to check status: {e}[/red]")
 
     def check_config_files(self, conn):
         """Check if critical configuration files exist"""
@@ -817,6 +905,10 @@ class DeploymentHandler:
             (f"/etc/nginx/sites-enabled/{app_name}", "nginx site symlink"),
         ]
 
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("File", style="cyan")
+        table.add_column("Status")
+
         for file_path, description in files_to_check:
             result = self._run(conn, f"test -e {file_path}", warn=True, hide=True)
             if result.ok:
@@ -826,21 +918,17 @@ class DeploymentHandler:
                         conn, f"test -x {file_path}", warn=True, hide=True
                     )
                     if exec_result.ok:
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f"  ✓ {description} exists and is executable"
-                            )
-                        )
+                        table.add_row(description, "[green]exists (executable)[/green]")
                     else:
-                        self.stdout.write(
-                            self.style.WARNING(
-                                f"  ⚠ {description} exists but is not executable"
-                            )
+                        table.add_row(
+                            description, "[yellow]exists (not executable)[/yellow]"
                         )
                 else:
-                    self.stdout.write(self.style.SUCCESS(f"  ✓ {description} exists"))
+                    table.add_row(description, "[green]exists[/green]")
             else:
-                self.stdout.write(self.style.ERROR(f"  ✗ {description} missing"))
+                table.add_row(description, "[red]missing[/red]")
+
+        self.console.print(table)
 
     def check_docker_status(self, conn):
         """Check if Docker is running and show container status"""
@@ -861,13 +949,13 @@ class DeploymentHandler:
                     container_info[1],
                     container_info[2],
                 )
-                self.stdout.write(self.style.SUCCESS(f"  ✓ Container running: {name}"))
-                self.stdout.write(f"    Status: {status}")
-                self.stdout.write(f"    Image: {image}")
+                self.console.print(f"[green]  ✓ Container running: {name}[/green]")
+                self.console.print(f"    Status: {status}")
+                self.console.print(f"    Image: {image}")
             else:
-                self.stdout.write(self.style.SUCCESS("  ✓ Container running"))
+                self.console.print("[green]  ✓ Container running[/green]")
         else:
-            self.stdout.write(self.style.ERROR("  ✗ Container not running"))
+            self.console.print("[red]  ✗ Container not running[/red]")
 
             # Check if container exists but is stopped
             stopped = self._sudo(
@@ -877,8 +965,8 @@ class DeploymentHandler:
                 hide=True,
             )
             if stopped.ok and stopped.stdout.strip():
-                self.stdout.write(
-                    self.style.WARNING(f"    ⚠ Container exists but is stopped")
+                self.console.print(
+                    "[yellow]    Container exists but is stopped[/yellow]"
                 )
 
         # Check if image exists
@@ -891,35 +979,39 @@ class DeploymentHandler:
         if image_result.ok and image_result.stdout.strip():
             image_info = image_result.stdout.strip().split("|")
             if len(image_info) >= 2:
-                self.stdout.write(
+                self.console.print(
                     f"  Image: {app_name}:latest (created {image_info[1]})"
                 )
         else:
-            self.stdout.write(
-                self.style.WARNING(f"  ⚠ Image {app_name}:latest not found")
+            self.console.print(
+                f"[yellow]  Image {app_name}:latest not found[/yellow]"
             )
 
     def check_services_status(self, conn):
         """Check systemd service status"""
         app_name = self.config.get("app_name", DEFAULT_APP_NAME)
 
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Service", style="cyan")
+        table.add_column("Status")
+
         # Check app service (should be continuously running)
         result = self._run(
             conn, f"systemctl is-active {app_name}-app.service", warn=True, hide=True
         )
         if result.ok and "active" in result.stdout:
-            self.stdout.write(self.style.SUCCESS(f"  ✓ {app_name}-app.service active"))
+            table.add_row(f"{app_name}-app.service", "[green]active[/green]")
         else:
-            self.stdout.write(self.style.ERROR(f"  ✗ {app_name}-app.service inactive"))
+            table.add_row(f"{app_name}-app.service", "[red]inactive[/red]")
 
         # Check backup timer (should be active)
         result = self._run(
             conn, f"systemctl is-active {app_name}-backup.timer", warn=True, hide=True
         )
         if result.ok and "active" in result.stdout:
-            self.stdout.write(self.style.SUCCESS(f"  ✓ {app_name}-backup.timer active"))
+            table.add_row(f"{app_name}-backup.timer", "[green]active[/green]")
         else:
-            self.stdout.write(self.style.ERROR(f"  ✗ {app_name}-backup.timer inactive"))
+            table.add_row(f"{app_name}-backup.timer", "[red]inactive[/red]")
 
         # Check backup service last run result (oneshot service, check exit status not active state)
         result = self._run(
@@ -931,36 +1023,34 @@ class DeploymentHandler:
         if result.ok:
             status = result.stdout.strip()
             if status == "success":
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  ✓ {app_name}-backup.service last run: success"
-                    )
+                table.add_row(
+                    f"{app_name}-backup.service (last run)", "[green]success[/green]"
                 )
             elif status == "exit-code":
-                self.stdout.write(
-                    self.style.ERROR(f"  ✗ {app_name}-backup.service last run: failed")
+                table.add_row(
+                    f"{app_name}-backup.service (last run)", "[red]failed[/red]"
                 )
             else:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"  ⚠ {app_name}-backup.service last run: {status}"
-                    )
+                table.add_row(
+                    f"{app_name}-backup.service (last run)", f"[yellow]{status}[/yellow]"
                 )
+
+        self.console.print(table)
 
     def check_nginx_status(self, conn):
         """Check nginx status"""
         result = self._run(conn, "systemctl is-active nginx", warn=True, hide=True)
         if result.ok and "active" in result.stdout:
-            self.stdout.write(self.style.SUCCESS("  ✓ Nginx active"))
+            self.console.print("[green]  ✓ Nginx active[/green]")
         else:
-            self.stdout.write(self.style.ERROR("  ✗ Nginx inactive"))
+            self.console.print("[red]  ✗ Nginx inactive[/red]")
 
     def check_application_health(self, conn):
         """Check if application is responding to HTTP requests"""
         domain = self.config.get("domain")
         if not domain:
-            self.stdout.write(
-                self.style.WARNING("  ⚠ No domain configured, skipping health check")
+            self.console.print(
+                "[yellow]  No domain configured, skipping health check[/yellow]"
             )
             return
 
@@ -975,10 +1065,8 @@ class DeploymentHandler:
             if result.ok:
                 status_code = result.stdout.strip()
                 if status_code.startswith("2") or status_code.startswith("3"):
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"  ✓ Application responding ({protocol.upper()} {status_code})"
-                        )
+                    self.console.print(
+                        f"[green]  ✓ Application responding ({protocol.upper()} {status_code})[/green]"
                     )
 
                     # If HTTPS is working, also check certificate expiry
@@ -994,21 +1082,19 @@ class DeploymentHandler:
                             for line in cert_info.stdout.strip().split("\n"):
                                 if "notAfter" in line:
                                     expiry = line.replace("notAfter=", "").strip()
-                                    self.stdout.write(
-                                        f"  ✓ SSL certificate expires: {expiry}"
+                                    self.console.print(
+                                        f"[green]  ✓ SSL certificate expires: {expiry}[/green]"
                                     )
 
                     return
                 else:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"  ⚠ Application returned {protocol.upper()} {status_code}"
-                        )
+                    self.console.print(
+                        f"[yellow]  Application returned {protocol.upper()} {status_code}[/yellow]"
                     )
                     return
 
-        self.stdout.write(
-            self.style.ERROR(f"  ✗ Application not responding at {domain}")
+        self.console.print(
+            f"[red]  ✗ Application not responding at {domain}[/red]"
         )
 
     def check_disk_status(self, conn):
@@ -1016,7 +1102,7 @@ class DeploymentHandler:
         result = self._run(conn, "df -h /", hide=True)
         lines = result.stdout.strip().split("\n")
         if len(lines) >= 2:
-            self.stdout.write(f"  {lines[1]}")
+            self.console.print(f"  {lines[1]}")
 
     def check_backup_status(self, conn):
         """Check last backup time"""
@@ -1029,9 +1115,13 @@ class DeploymentHandler:
         )
         if result.ok and result.stdout.strip():
             latest = result.stdout.strip().split("/")[-1]
-            self.stdout.write(self.style.SUCCESS(f"  ✓ Latest backup: {latest}"))
+            self.console.print(f"[green]  ✓ Latest backup: {latest}[/green]")
 
-            # Count backups
+            # Count backups per tier
+            table = Table(show_header=True, header_style="bold")
+            table.add_column("Tier", style="cyan")
+            table.add_column("Count", justify="right")
+
             for tier in ["hourly", "daily", "weekly", "monthly"]:
                 count_result = self._run(
                     conn,
@@ -1041,6 +1131,8 @@ class DeploymentHandler:
                 )
                 if count_result.ok:
                     count = count_result.stdout.strip()
-                    self.stdout.write(f"    {tier.capitalize()}: {count} backups")
+                    table.add_row(tier.capitalize(), count)
+
+            self.console.print(table)
         else:
-            self.stdout.write(self.style.WARNING("  ⚠ No backups found"))
+            self.console.print("[yellow]  No backups found[/yellow]")

@@ -33,6 +33,7 @@ dependencies = [
     "django-markdownify>=0.9.6",
     "fabric>=3.2.2",
     "pillow>=12.1.0",
+    "rich>=14.0.0",
 ]
 
 [project.urls]
