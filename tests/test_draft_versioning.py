@@ -1,9 +1,11 @@
 import reversion
 from reversion.models import Version
 
-from django.test import TestCase
+from django.contrib.admin.sites import AdminSite
+from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User
 
+from django_mosaic.admin import PostAdmin
 from django_mosaic.models import Post, Namespace, Author
 
 
@@ -197,6 +199,75 @@ class PublishRevisionTest(RevisionTestBase):
         self.assertEqual(post.published_version_id, latest.pk)
         self.assertEqual(post.published_content, "v2 ready to publish")
         self.assertTrue(post.is_published)
+
+
+class AdminRevisionCreationTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.ns = Namespace.objects.create(name="rev-admin")
+        cls.user = User.objects.create_superuser("admin", "admin@test.com", "pass")
+        cls.author = Author.objects.create(user=cls.user, h_card={})
+
+    def setUp(self):
+        self.client.force_login(self.user)
+        with reversion.create_revision():
+            self.post = Post.objects.create(
+                author=self.author,
+                title="Admin Test",
+                slug="admin-test",
+                content="original",
+                namespace=self.ns,
+                is_published=True,
+            )
+
+    def _post_data(self, **overrides):
+        data = {
+            "author": self.author.pk,
+            "title": self.post.title,
+            "content": self.post.content,
+            "namespace": self.ns.pk,
+            "is_published": "on",
+            "slug": self.post.slug,
+            "published_version": "",
+            "tags": [],
+            "contentimage_set-TOTAL_FORMS": "0",
+            "contentimage_set-INITIAL_FORMS": "0",
+            "contentimage_set-MIN_NUM_FORMS": "0",
+            "contentimage_set-MAX_NUM_FORMS": "1000",
+            "_save": "Save",
+        }
+        data.update(overrides)
+        return data
+
+    def test_save_without_content_change_creates_no_revision(self):
+        count_before = Version.objects.get_for_object(self.post).count()
+        self.client.post(
+            f"/admin/django_mosaic/post/{self.post.pk}/change/",
+            self._post_data(),
+        )
+        count_after = Version.objects.get_for_object(self.post).count()
+        self.assertEqual(count_after, count_before)
+
+    def test_save_with_content_change_creates_revision(self):
+        count_before = Version.objects.get_for_object(self.post).count()
+        self.client.post(
+            f"/admin/django_mosaic/post/{self.post.pk}/change/",
+            self._post_data(content="updated content"),
+        )
+        count_after = Version.objects.get_for_object(self.post).count()
+        self.assertEqual(count_after, count_before + 1)
+        latest = Version.objects.get_for_object(self.post).first()
+        self.assertEqual(latest.field_dict["content"], "updated content")
+
+    def test_save_and_publish_pins_latest_version(self):
+        self.client.post(
+            f"/admin/django_mosaic/post/{self.post.pk}/change/",
+            {**self._post_data(content="publish me"), "_publish": "Save and publish", "_save": ""},
+        )
+        self.post.refresh_from_db()
+        latest = Version.objects.get_for_object(self.post).first()
+        self.assertEqual(self.post.published_version_id, latest.pk)
+        self.assertEqual(self.post.published_content, "publish me")
 
 
 class FeedPublishedContentTest(RevisionTestBase):

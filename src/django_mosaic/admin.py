@@ -106,14 +106,21 @@ class PostAdmin(VersionAdmin):
             extra_context["draft_preview_url"] = reverse(
                 "draft-detail", args=[obj.namespace.name, obj.secret_id]
             )
-        return super().change_view(request, object_id, form_url, extra_context)
+        # Bypass VersionAdmin.change_view which wraps everything in
+        # create_revision(). We handle revision creation in save_model
+        # so revisions are only created when content actually changes.
+        return admin.ModelAdmin.change_view(
+            self, request, object_id, form_url, extra_context
+        )
 
     def save_model(self, request, obj, form, change):
         content_changed = not change or "content" in form.changed_data
         if content_changed:
-            super().save_model(request, obj, form, change)
+            with reversion.create_revision():
+                obj.save()
+                reversion.set_user(request.user)
         else:
-            admin.ModelAdmin.save_model(self, request, obj, form, change)
+            obj.save()
 
         if "_publish" in request.POST:
             latest = Version.objects.get_for_object(obj).first()
