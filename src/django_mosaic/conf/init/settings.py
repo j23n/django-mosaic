@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "django.contrib.sitemaps",
     # Mosaic dependencies
     "markdownify.apps.MarkdownifyConfig",
+    "reversion",
     "django_magic_authorization",
     # Mosaic blog
     "django_mosaic",
