@@ -71,7 +71,7 @@ class PostAdminForm(forms.ModelForm):
 
 class PostAdmin(VersionAdmin):
     form = PostAdminForm
-    exclude = ["published_version_id"]
+    exclude = ["published_version_id", "secret_id"]
     readonly_fields = ["created_at"]
     list_display = [
         "title",
@@ -109,7 +109,12 @@ class PostAdmin(VersionAdmin):
         return super().change_view(request, object_id, form_url, extra_context)
 
     def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
+        content_changed = not change or "content" in form.changed_data
+        if content_changed:
+            super().save_model(request, obj, form, change)
+        else:
+            admin.ModelAdmin.save_model(self, request, obj, form, change)
+
         if "_publish" in request.POST:
             latest = Version.objects.get_for_object(obj).first()
             if latest:
