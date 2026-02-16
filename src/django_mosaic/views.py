@@ -62,14 +62,12 @@ def draft_detail(request, namespace, secret_id):
 
     versions = Version.objects.get_for_object(post)
     if versions.exists():
-        display_content = versions.first().field_dict.get("content", post.content)
-    else:
-        display_content = post.content
+        post.content = versions.first().field_dict.get("content", post.content)
 
     response = render(
         request,
         "post-detail.html",
-        {"post": post, "display_content": display_content, "is_draft": True, "namespace": namespace},
+        {"post": post, "is_draft": True, "namespace": namespace},
     )
     response["Referrer-Policy"] = "no-referrer"
     return response
