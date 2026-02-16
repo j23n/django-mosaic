@@ -1,3 +1,7 @@
+import reversion
+from reversion.admin import VersionAdmin
+from reversion.models import Version
+
 from django.contrib import admin, messages
 from django.db import models
 from django import forms
@@ -38,19 +42,47 @@ class ContentImageInlineAdmin(admin.TabularInline):
     copy_markdown_button.short_description = "Markdown"
 
 
-class PostAdmin(admin.ModelAdmin):
-    readonly_fields = ["created_at", "draft_preview_link"]
+class PostAdminForm(forms.ModelForm):
+    published_version = forms.ChoiceField(
+        required=False,
+        label="Published revision",
+        help_text="Select which revision is shown on the public site.",
+    )
+
+    class Meta:
+        model = Post
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [("", "--- latest (no pinned revision) ---")]
+        if self.instance and self.instance.pk:
+            versions = Version.objects.get_for_object(self.instance)
+            for v in versions:
+                snippet = v.field_dict.get("content", "")[:60]
+                label = f"#{v.pk} — {v.revision.date_created:%Y-%m-%d %H:%M} — {snippet}"
+                choices.append((str(v.pk), label))
+        self.fields["published_version"].choices = choices
+        if self.instance and self.instance.published_version_id is not None:
+            self.fields["published_version"].initial = str(
+                self.instance.published_version_id
+            )
+
+
+class PostAdmin(VersionAdmin):
+    form = PostAdminForm
+    exclude = ["published_version_id", "secret_id"]
+    readonly_fields = ["created_at"]
     list_display = [
         "title",
         "is_published",
-        "has_draft_indicator",
         "published_at",
         "namespace",
         "get_tags",
         "changed_at",
     ]
     list_filter = ["is_published", "namespace", "tags", "published_at"]
-    actions = ["publish_draft"]
+    actions = ["publish_revision"]
 
     formfield_overrides = {
         models.TextField: {
@@ -62,46 +94,68 @@ class PostAdmin(admin.ModelAdmin):
 
     inlines = [ContentImageInlineAdmin]
 
+    change_form_template = "admin/django_mosaic/post/change_form.html"
+
     def get_tags(self, obj):
         return ", ".join([t.name for t in obj.tags.all()])
 
-    def has_draft_indicator(self, obj):
-        return "Draft pending" if obj.has_draft else ""
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        extra_context = extra_context or {}
+        obj = self.get_object(request, object_id)
+        if obj:
+            extra_context["draft_preview_url"] = reverse(
+                "draft-detail", args=[obj.namespace.name, obj.secret_id]
+            )
+        # Bypass VersionAdmin.change_view which wraps everything in
+        # create_revision(). We handle revision creation in save_model
+        # so revisions are only created when content actually changes.
+        return admin.ModelAdmin.change_view(
+            self, request, object_id, form_url, extra_context
+        )
 
-    has_draft_indicator.short_description = "Draft"
+    def save_model(self, request, obj, form, change):
+        content_changed = not change or "content" in form.changed_data
+        if content_changed:
+            with reversion.create_revision():
+                obj.save()
+                reversion.set_user(request.user)
+        else:
+            obj.save()
 
-    def draft_preview_link(self, obj):
-        if not obj.pk:
-            return ""
-        if obj.has_draft:
-            url = reverse("draft-detail", args=[obj.namespace.name, obj.secret_id])
-            return format_html('<a href="{}" target="_blank">Preview draft</a>', url)
-        return "No draft pending"
+        if "_publish" in request.POST:
+            latest = Version.objects.get_for_object(obj).first()
+            if latest:
+                obj.published_version_id = latest.pk
+                obj.save(update_fields=["published_version_id"])
+        else:
+            chosen = form.cleaned_data.get("published_version")
+            obj.published_version_id = int(chosen) if chosen else None
+            obj.save(update_fields=["published_version_id"])
 
-    draft_preview_link.short_description = "Draft preview"
-
-    @admin.action(description="Publish draft content")
-    def publish_draft(self, request, queryset):
+    @admin.action(description="Publish latest revision")
+    def publish_revision(self, request, queryset):
         published = 0
         skipped = 0
         for post in queryset:
-            if post.has_draft:
-                post.content = post.draft_content
-                post.draft_content = None
-                post.save(update_fields=["content", "draft_content"])
-                published += 1
-            else:
+            versions = Version.objects.get_for_object(post)
+            if not versions.exists():
                 skipped += 1
+                continue
+            latest = versions.first()
+            post.published_version_id = latest.pk
+            post.is_published = True
+            post.save(update_fields=["published_version_id", "is_published"])
+            published += 1
         if published:
             self.message_user(
                 request,
-                f"Published draft content for {published} post(s).",
+                f"Published latest revision for {published} post(s).",
                 messages.SUCCESS,
             )
         if skipped:
             self.message_user(
                 request,
-                f"Skipped {skipped} post(s) with no draft content.",
+                f"Skipped {skipped} post(s) (no revisions found).",
                 messages.WARNING,
             )
 

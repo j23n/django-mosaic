@@ -1,0 +1,27 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block submit_buttons_bottom %}
+{{ block.super }}
+<script>
+(function() {
+    var row = document.querySelector('.submit-row');
+    if (!row) return;
+
+    var publishBtn = document.createElement('input');
+    publishBtn.type = 'submit';
+    publishBtn.value = "{% translate 'Save and publish' %}";
+    publishBtn.name = '_publish';
+    row.appendChild(publishBtn);
+
+    {% if draft_preview_url %}
+    var previewLink = document.createElement('a');
+    previewLink.href = "{{ draft_preview_url }}";
+    previewLink.target = '_blank';
+    previewLink.textContent = "{% translate 'Draft preview' %}";
+    previewLink.style.cssText = 'padding: 10px 15px; float: right;';
+    row.appendChild(previewLink);
+    {% endif %}
+})();
+</script>
+{% endblock %}

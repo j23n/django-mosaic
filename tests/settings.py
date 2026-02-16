@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.sitemaps",
     "markdownify.apps.MarkdownifyConfig",
+    "reversion",
     "django_magic_authorization",
     "django_mosaic",
 ]

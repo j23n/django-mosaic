@@ -50,7 +50,7 @@ by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.userna
 {{ post.summary }}
 </div>
 <div class="e-content">
-{{ display_content|default:post.content|markdownify }}
+{{ post.content|markdownify }}
 </div>
 
 </article>

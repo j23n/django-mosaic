@@ -1,74 +1,114 @@
-from django.test import TestCase
+import reversion
+from reversion.models import Version
+
+from django.contrib.admin.sites import AdminSite
+from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User
 
-from django_mosaic.models import Post, Namespace, Author
 from django_mosaic.admin import PostAdmin
+from django_mosaic.models import Post, Namespace, Author
 
 
-class DraftVersioningTestBase(TestCase):
+class RevisionTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.ns = Namespace.objects.create(name="public")
         user = User.objects.create_user("testuser")
         cls.author = Author.objects.create(user=user, h_card={})
 
-        cls.published_post = Post.objects.create(
-            author=cls.author,
-            title="Published Post",
-            slug="dv-published-post",
-            content="Published content",
-            namespace=cls.ns,
-            is_published=True,
-        )
-        cls.draft_post = Post.objects.create(
-            author=cls.author,
-            title="Draft Post",
-            slug="dv-draft-post",
-            content="Original content",
-            draft_content="Draft content here",
-            namespace=cls.ns,
-            is_published=True,
-        )
+        with reversion.create_revision():
+            cls.published_post = Post.objects.create(
+                author=cls.author,
+                title="Published Post",
+                slug="dv-published-post",
+                content="Published content",
+                namespace=cls.ns,
+                is_published=True,
+            )
+
+        with reversion.create_revision():
+            cls.draft_post = Post.objects.create(
+                author=cls.author,
+                title="Draft Post",
+                slug="dv-draft-post",
+                content="Original content",
+                namespace=cls.ns,
+                is_published=True,
+            )
+        # Create a second revision with updated content (the "draft")
+        with reversion.create_revision():
+            cls.draft_post.content = "Draft content here"
+            cls.draft_post.save()
 
 
-class DraftModelTest(DraftVersioningTestBase):
-    def test_draft_content_defaults_to_none(self):
-        post = Post.objects.create(
-            author=self.author,
-            title="New Post",
-            content="Content",
-            namespace=self.ns,
-        )
-        self.assertIsNone(post.draft_content)
+class RevisionModelTest(RevisionTestBase):
+    def test_revisions_are_created(self):
+        versions = Version.objects.get_for_object(self.draft_post)
+        self.assertEqual(versions.count(), 2)
 
-    def test_has_draft_true_when_draft_content_set(self):
-        self.assertTrue(self.draft_post.has_draft)
+    def test_latest_revision_has_updated_content(self):
+        latest = Version.objects.get_for_object(self.draft_post).first()
+        self.assertEqual(latest.field_dict["content"], "Draft content here")
 
-    def test_has_draft_false_when_no_draft_content(self):
-        self.assertFalse(self.published_post.has_draft)
+    def test_original_revision_preserved(self):
+        versions = Version.objects.get_for_object(self.draft_post)
+        original = versions.last()
+        self.assertEqual(original.field_dict["content"], "Original content")
 
 
-class DraftViewContentTest(DraftVersioningTestBase):
-    def test_draft_view_shows_draft_content_when_set(self):
+class DraftViewContentTest(RevisionTestBase):
+    def test_draft_view_shows_latest_revision_content(self):
         resp = self.client.get(
             f"/public/posts/drafts/{self.draft_post.secret_id}"
         )
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Draft content here")
-        # The e-content div should show draft content, not original
-        self.assertContains(resp, '<div class="e-content">\nDraft content here\n</div>')
-        self.assertNotContains(resp, '<div class="e-content">\nOriginal content\n</div>')
 
-    def test_draft_view_falls_back_to_content(self):
+    def test_draft_view_falls_back_to_current_content(self):
+        """When no revisions exist, the view shows current content."""
+        post = Post.objects.create(
+            author=self.author,
+            title="No Revisions",
+            slug="no-revisions",
+            content="Fallback content",
+            namespace=self.ns,
+            is_published=True,
+        )
         resp = self.client.get(
-            f"/public/posts/drafts/{self.published_post.secret_id}"
+            f"/public/posts/drafts/{post.secret_id}"
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Published content")
+        self.assertContains(resp, "Fallback content")
 
 
-class PublishedViewIsolationTest(DraftVersioningTestBase):
-    def test_published_view_never_shows_draft_content(self):
+class PublishedContentPropertyTest(RevisionTestBase):
+    def test_published_content_returns_version_content_when_set(self):
+        versions = Version.objects.get_for_object(self.draft_post)
+        original = versions.last()
+        self.draft_post.published_version_id = original.pk
+        self.assertEqual(self.draft_post.published_content, "Original content")
+
+    def test_published_content_falls_back_when_unset(self):
+        self.draft_post.published_version_id = None
+        self.assertEqual(
+            self.draft_post.published_content, self.draft_post.content
+        )
+
+    def test_published_content_falls_back_when_version_deleted(self):
+        self.draft_post.published_version_id = 999999
+        self.assertEqual(
+            self.draft_post.published_content, self.draft_post.content
+        )
+
+
+class PublishedViewIsolationTest(RevisionTestBase):
+    def test_published_view_shows_published_content(self):
+        # Pin published_version_id to the original revision
+        versions = Version.objects.get_for_object(self.draft_post)
+        original = versions.last()
+        self.draft_post.published_version_id = original.pk
+        self.draft_post.save(update_fields=["published_version_id"])
+
         year = self.draft_post.published_at.year
         resp = self.client.get(
             f"/public/posts/{year}/{self.draft_post.slug}"
@@ -77,8 +117,33 @@ class PublishedViewIsolationTest(DraftVersioningTestBase):
         self.assertContains(resp, "Original content")
         self.assertNotContains(resp, "Draft content here")
 
+    def test_published_view_shows_current_content_when_no_version_pinned(self):
+        # When no version is pinned, published_content falls back to self.content
+        self.draft_post.published_version_id = None
+        self.draft_post.save(update_fields=["published_version_id"])
 
-class DraftBannerTest(DraftVersioningTestBase):
+        year = self.draft_post.published_at.year
+        resp = self.client.get(
+            f"/public/posts/{year}/{self.draft_post.slug}"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Draft content here")
+
+    def test_draft_view_shows_latest_revision_regardless(self):
+        # Even with a pinned published version, draft view shows latest
+        versions = Version.objects.get_for_object(self.draft_post)
+        original = versions.last()
+        self.draft_post.published_version_id = original.pk
+        self.draft_post.save(update_fields=["published_version_id"])
+
+        resp = self.client.get(
+            f"/public/posts/drafts/{self.draft_post.secret_id}"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Draft content here")
+
+
+class DraftBannerTest(RevisionTestBase):
     def test_draft_banner_shown_on_draft_url(self):
         resp = self.client.get(
             f"/public/posts/drafts/{self.published_post.secret_id}"
@@ -93,7 +158,7 @@ class DraftBannerTest(DraftVersioningTestBase):
         self.assertNotContains(resp, "Draft preview")
 
 
-class ReferrerPolicyTest(DraftVersioningTestBase):
+class ReferrerPolicyTest(RevisionTestBase):
     def test_draft_response_has_no_referrer_header(self):
         resp = self.client.get(
             f"/public/posts/drafts/{self.published_post.secret_id}"
@@ -108,48 +173,111 @@ class ReferrerPolicyTest(DraftVersioningTestBase):
         self.assertFalse(resp.has_header("Referrer-Policy"))
 
 
-class AdminPublishDraftTest(DraftVersioningTestBase):
-    def test_publish_draft_copies_content_and_clears_draft(self):
-        post = self.draft_post
+class PublishRevisionTest(RevisionTestBase):
+    def test_publish_revision_sets_published_version_id(self):
+        """Simulate the admin action: publish latest revision."""
+        post = Post.objects.create(
+            author=self.author,
+            title="Unpublished",
+            slug="unpublished",
+            content="v1",
+            namespace=self.ns,
+            is_published=False,
+        )
+        with reversion.create_revision():
+            post.content = "v2 ready to publish"
+            post.save()
+
+        # Simulate admin action logic
+        versions = Version.objects.get_for_object(post)
+        latest = versions.first()
+        post.published_version_id = latest.pk
+        post.is_published = True
+        post.save(update_fields=["published_version_id", "is_published"])
+
         post.refresh_from_db()
-
-        post.content = post.draft_content
-        post.draft_content = None
-        post.save(update_fields=["content", "draft_content"])
-
-        post.refresh_from_db()
-        self.assertEqual(post.content, "Draft content here")
-        self.assertIsNone(post.draft_content)
-        self.assertFalse(post.has_draft)
-
-    def test_publish_draft_skips_posts_without_draft(self):
-        post = self.published_post
-        original_content = post.content
-        post.refresh_from_db()
-
-        # Simulate the action logic: skip if no draft
-        self.assertFalse(post.has_draft)
-        self.assertEqual(post.content, original_content)
+        self.assertEqual(post.published_version_id, latest.pk)
+        self.assertEqual(post.published_content, "v2 ready to publish")
+        self.assertTrue(post.is_published)
 
 
-class AdminIndicatorTest(DraftVersioningTestBase):
-    def test_has_draft_indicator_shows_draft_pending(self):
-        admin = PostAdmin(Post, None)
-        result = admin.has_draft_indicator(self.draft_post)
-        self.assertEqual(result, "Draft pending")
+class AdminRevisionCreationTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.ns = Namespace.objects.create(name="rev-admin")
+        cls.user = User.objects.create_superuser("admin", "admin@test.com", "pass")
+        cls.author = Author.objects.create(user=cls.user, h_card={})
 
-    def test_has_draft_indicator_empty_when_no_draft(self):
-        admin = PostAdmin(Post, None)
-        result = admin.has_draft_indicator(self.published_post)
-        self.assertEqual(result, "")
+    def setUp(self):
+        self.client.force_login(self.user)
+        with reversion.create_revision():
+            self.post = Post.objects.create(
+                author=self.author,
+                title="Admin Test",
+                slug="admin-test",
+                content="original",
+                namespace=self.ns,
+                is_published=True,
+            )
 
-    def test_draft_preview_link_shows_link_when_draft(self):
-        admin = PostAdmin(Post, None)
-        result = admin.draft_preview_link(self.draft_post)
-        self.assertIn("Preview draft", result)
-        self.assertIn(self.draft_post.secret_id, result)
+    def _post_data(self, **overrides):
+        data = {
+            "author": self.author.pk,
+            "title": self.post.title,
+            "content": self.post.content,
+            "namespace": self.ns.pk,
+            "is_published": "on",
+            "slug": self.post.slug,
+            "published_version": "",
+            "tags": [],
+            "contentimage_set-TOTAL_FORMS": "0",
+            "contentimage_set-INITIAL_FORMS": "0",
+            "contentimage_set-MIN_NUM_FORMS": "0",
+            "contentimage_set-MAX_NUM_FORMS": "1000",
+            "_save": "Save",
+        }
+        data.update(overrides)
+        return data
 
-    def test_draft_preview_link_shows_no_draft_when_none(self):
-        admin = PostAdmin(Post, None)
-        result = admin.draft_preview_link(self.published_post)
-        self.assertEqual(result, "No draft pending")
+    def test_save_without_content_change_creates_no_revision(self):
+        count_before = Version.objects.get_for_object(self.post).count()
+        self.client.post(
+            f"/admin/django_mosaic/post/{self.post.pk}/change/",
+            self._post_data(),
+        )
+        count_after = Version.objects.get_for_object(self.post).count()
+        self.assertEqual(count_after, count_before)
+
+    def test_save_with_content_change_creates_revision(self):
+        count_before = Version.objects.get_for_object(self.post).count()
+        self.client.post(
+            f"/admin/django_mosaic/post/{self.post.pk}/change/",
+            self._post_data(content="updated content"),
+        )
+        count_after = Version.objects.get_for_object(self.post).count()
+        self.assertEqual(count_after, count_before + 1)
+        latest = Version.objects.get_for_object(self.post).first()
+        self.assertEqual(latest.field_dict["content"], "updated content")
+
+    def test_save_and_publish_pins_latest_version(self):
+        self.client.post(
+            f"/admin/django_mosaic/post/{self.post.pk}/change/",
+            {**self._post_data(content="publish me"), "_publish": "Save and publish", "_save": ""},
+        )
+        self.post.refresh_from_db()
+        latest = Version.objects.get_for_object(self.post).first()
+        self.assertEqual(self.post.published_version_id, latest.pk)
+        self.assertEqual(self.post.published_content, "publish me")
+
+
+class FeedPublishedContentTest(RevisionTestBase):
+    def test_feed_uses_published_content(self):
+        # Pin to original version
+        versions = Version.objects.get_for_object(self.draft_post)
+        original = versions.last()
+        self.draft_post.published_version_id = original.pk
+        self.draft_post.save(update_fields=["published_version_id"])
+
+        resp = self.client.get("/public/feed")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Original content")

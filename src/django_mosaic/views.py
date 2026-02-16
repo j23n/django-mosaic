@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from reversion.models import Version
 from django_mosaic.models import Post, Tag, ContentImage
 
 
@@ -28,6 +29,7 @@ def post_detail(request, namespace, year, post_slug):
     post = get_object_or_404(
         Post, slug=post_slug, namespace__name=namespace, is_published=True
     )
+    post.content = post.published_content
 
     next_post = (
         Post.objects.filter(
@@ -59,12 +61,14 @@ def post_detail(request, namespace, year, post_slug):
 def draft_detail(request, namespace, secret_id):
     post = get_object_or_404(Post, secret_id=secret_id)
 
-    display_content = post.draft_content if post.draft_content is not None else post.content
+    versions = Version.objects.get_for_object(post)
+    if versions.exists():
+        post.content = versions.first().field_dict.get("content", post.content)
 
     response = render(
         request,
         "post-detail.html",
-        {"post": post, "display_content": display_content, "is_draft": True, "namespace": namespace},
+        {"post": post, "is_draft": True, "namespace": namespace},
     )
     response["Referrer-Policy"] = "no-referrer"
     return response

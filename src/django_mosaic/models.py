@@ -1,5 +1,7 @@
 import bleach
 import markdown
+import reversion
+from reversion.models import Version
 import secrets
 from PIL import Image
 from io import BytesIO
@@ -130,13 +132,14 @@ class ContentImage(models.Model):
         )
 
 
+@reversion.register(exclude=["published_version_id"])
 class Post(models.Model):
     author = models.ForeignKey(Author, on_delete=models.PROTECT)
     title = models.CharField(max_length=512, blank=False, null=False)
     content = models.TextField()
-    draft_content = models.TextField(blank=True, null=True, default=None)
     slug = models.SlugField(max_length=256, blank=True, null=False, unique=True)
     summary = models.CharField(max_length=1024, null=False, blank=True)
+    published_version_id = models.IntegerField(null=True, blank=True)
 
     namespace = models.ForeignKey(
         "Namespace", on_delete=models.PROTECT, blank=False, null=False
@@ -186,12 +189,18 @@ class Post(models.Model):
         return super().save(*args, **kwargs)
 
     @property
-    def has_draft(self):
-        return self.draft_content is not None
-
-    @property
     def featured_image(self):
         return self.contentimage_set.filter(is_featured=True).first() or self.contentimage_set.first()
+
+    @property
+    def published_content(self):
+        if self.published_version_id is not None:
+            try:
+                version = Version.objects.get(pk=self.published_version_id)
+                return version.field_dict.get("content", self.content)
+            except Version.DoesNotExist:
+                pass
+        return self.content
 
     def get_absolute_url(self):
         if self.is_published:
@@ -200,7 +209,7 @@ class Post(models.Model):
                 args=[self.namespace.name, self.published_at.year, self.slug],
             )
         else:
-            return reverse("draft-detail", args=[self.secret_id])
+            return reverse("draft-detail", args=[self.namespace.name, self.secret_id])
 
     def __str__(self):
         return f"{self.title}"
