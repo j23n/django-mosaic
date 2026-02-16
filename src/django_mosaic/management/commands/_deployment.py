@@ -96,32 +96,34 @@ class DeploymentHandler:
             result = result.replace(placeholder, value)
         return result
 
-    def _run(self, conn, cmd, description=None, **kwargs):
+    def _run(self, conn, cmd, description=None, quiet=False, **kwargs):
         """Execute conn.run() with display and confirmation"""
-        if description and self.explain_mode:
-            self.console.print(f"\n{description}")
-        self.console.print(f"  $ {cmd}", style="dim")
+        if not quiet:
+            if description and self.explain_mode:
+                self.console.print(f"\n{description}")
+            self.console.print(f"  $ {cmd}", style="dim")
 
-        if not self.auto_mode:
-            response = input("  Execute? [Y/n]: ").strip()
-            if response.lower() == "n":
-                raise Exception("Deployment cancelled by user")
+            if not self.auto_mode:
+                response = input("  Execute? [Y/n]: ").strip()
+                if response.lower() == "n":
+                    raise Exception("Deployment cancelled by user")
 
         if self.dry_run:
             return None
 
         return conn.run(cmd, **kwargs)
 
-    def _sudo(self, conn, cmd, description=None, **kwargs):
+    def _sudo(self, conn, cmd, description=None, quiet=False, **kwargs):
         """Execute conn.sudo() with display and confirmation"""
-        if description and self.explain_mode:
-            self.console.print(f"\n{description}")
-        self.console.print(f"  $ sudo {cmd}", style="bold yellow")
+        if not quiet:
+            if description and self.explain_mode:
+                self.console.print(f"\n{description}")
+            self.console.print(f"  $ sudo {cmd}", style="bold yellow")
 
-        if not self.auto_mode:
-            response = input("  Execute? [Y/n]: ").strip()
-            if response.lower() == "n":
-                raise Exception("Deployment cancelled by user")
+            if not self.auto_mode:
+                response = input("  Execute? [Y/n]: ").strip()
+                if response.lower() == "n":
+                    raise Exception("Deployment cancelled by user")
 
         if self.dry_run:
             return None
@@ -910,12 +912,12 @@ class DeploymentHandler:
         table.add_column("Status")
 
         for file_path, description in files_to_check:
-            result = self._run(conn, f"test -e {file_path}", warn=True, hide=True)
+            result = self._run(conn, f"test -e {file_path}", quiet=True, warn=True, hide=True)
             if result.ok:
                 # Check if backup.sh is executable
                 if "backup.sh" in file_path:
                     exec_result = self._run(
-                        conn, f"test -x {file_path}", warn=True, hide=True
+                        conn, f"test -x {file_path}", quiet=True, warn=True, hide=True
                     )
                     if exec_result.ok:
                         table.add_row(description, "[green]exists (executable)[/green]")
@@ -934,10 +936,13 @@ class DeploymentHandler:
         """Check if Docker is running and show container status"""
         app_name = self.config.get("app_name", DEFAULT_APP_NAME)
 
+        container_image_id = None
+
         # Check if container is running
         result = self._sudo(
             conn,
-            f'docker ps --filter "name={app_name}" --format "{{{{.Names}}}}|{{{{.Status}}}}|{{{{.Image}}}}"',
+            f'docker ps --filter "name={app_name}" --format "{{{{.Names}}}}|{{{{.Status}}}}|{{{{.Image}}}}|{{{{.ID}}}}"',
+            quiet=True,
             warn=True,
             hide=True,
         )
@@ -952,6 +957,17 @@ class DeploymentHandler:
                 self.console.print(f"[green]  ✓ Container running: {name}[/green]")
                 self.console.print(f"    Status: {status}")
                 self.console.print(f"    Image: {image}")
+
+                # Get the image ID the container is actually using
+                inspect_result = self._sudo(
+                    conn,
+                    f"docker inspect --format '{{{{.Image}}}}' {name}",
+                    quiet=True,
+                    warn=True,
+                    hide=True,
+                )
+                if inspect_result.ok:
+                    container_image_id = inspect_result.stdout.strip()
             else:
                 self.console.print("[green]  ✓ Container running[/green]")
         else:
@@ -961,6 +977,7 @@ class DeploymentHandler:
             stopped = self._sudo(
                 conn,
                 f'docker ps -a --filter "name={app_name}" --format "{{{{.Names}}}}"',
+                quiet=True,
                 warn=True,
                 hide=True,
             )
@@ -973,15 +990,23 @@ class DeploymentHandler:
         image_result = self._sudo(
             conn,
             f'docker images {app_name}:latest --format "{{{{.ID}}}}|{{{{.CreatedAt}}}}"',
+            quiet=True,
             warn=True,
             hide=True,
         )
         if image_result.ok and image_result.stdout.strip():
             image_info = image_result.stdout.strip().split("|")
             if len(image_info) >= 2:
+                latest_image_id = image_info[0]
                 self.console.print(
                     f"  Image: {app_name}:latest (created {image_info[1]})"
                 )
+
+                # Check if running container uses an outdated image
+                if container_image_id and not container_image_id.endswith(latest_image_id):
+                    self.console.print(
+                        "[yellow]  Container is running an outdated image (restart needed)[/yellow]"
+                    )
         else:
             self.console.print(
                 f"[yellow]  Image {app_name}:latest not found[/yellow]"
@@ -997,7 +1022,7 @@ class DeploymentHandler:
 
         # Check app service (should be continuously running)
         result = self._run(
-            conn, f"systemctl is-active {app_name}-app.service", warn=True, hide=True
+            conn, f"systemctl is-active {app_name}-app.service", quiet=True, warn=True, hide=True
         )
         if result.ok and "active" in result.stdout:
             table.add_row(f"{app_name}-app.service", "[green]active[/green]")
@@ -1006,7 +1031,7 @@ class DeploymentHandler:
 
         # Check backup timer (should be active)
         result = self._run(
-            conn, f"systemctl is-active {app_name}-backup.timer", warn=True, hide=True
+            conn, f"systemctl is-active {app_name}-backup.timer", quiet=True, warn=True, hide=True
         )
         if result.ok and "active" in result.stdout:
             table.add_row(f"{app_name}-backup.timer", "[green]active[/green]")
@@ -1017,6 +1042,7 @@ class DeploymentHandler:
         result = self._run(
             conn,
             f"systemctl show {app_name}-backup.service -p Result --value",
+            quiet=True,
             warn=True,
             hide=True,
         )
@@ -1039,7 +1065,7 @@ class DeploymentHandler:
 
     def check_nginx_status(self, conn):
         """Check nginx status"""
-        result = self._run(conn, "systemctl is-active nginx", warn=True, hide=True)
+        result = self._run(conn, "systemctl is-active nginx", quiet=True, warn=True, hide=True)
         if result.ok and "active" in result.stdout:
             self.console.print("[green]  ✓ Nginx active[/green]")
         else:
@@ -1059,6 +1085,7 @@ class DeploymentHandler:
             result = self._run(
                 conn,
                 f'curl -s -o /dev/null -w "%{{http_code}}" --max-time {HEALTH_CHECK_TIMEOUT} {protocol}://{domain}/',
+                quiet=True,
                 warn=True,
                 hide=True,
             )
@@ -1075,6 +1102,7 @@ class DeploymentHandler:
                             conn,
                             f"echo | openssl s_client -servername {domain} -connect {domain}:443 2>/dev/null | "
                             f"openssl x509 -noout -dates",
+                            quiet=True,
                             warn=True,
                             hide=True,
                         )
@@ -1099,7 +1127,7 @@ class DeploymentHandler:
 
     def check_disk_status(self, conn):
         """Check disk space"""
-        result = self._run(conn, "df -h /", hide=True)
+        result = self._run(conn, "df -h /", quiet=True, hide=True)
         lines = result.stdout.strip().split("\n")
         if len(lines) >= 2:
             self.console.print(f"  {lines[1]}")
@@ -1110,6 +1138,7 @@ class DeploymentHandler:
         result = self._run(
             conn,
             f"ls -t {install_path}/backups/hourly/db-*.sqlite3 2>/dev/null | head -1",
+            quiet=True,
             warn=True,
             hide=True,
         )
@@ -1126,6 +1155,7 @@ class DeploymentHandler:
                 count_result = self._run(
                     conn,
                     f"ls -1 {install_path}/backups/{tier}/db-*.sqlite3 2>/dev/null | wc -l",
+                    quiet=True,
                     warn=True,
                     hide=True,
                 )
