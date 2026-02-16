@@ -8,7 +8,6 @@ Usage:
 """
 
 from django.core.management.base import BaseCommand
-from rich.console import Console
 from ._deployment import DeploymentHandler
 
 
@@ -76,8 +75,7 @@ class Command(BaseCommand):
         subcommand = options.get("subcommand")
 
         if command == "deployment":
-            console = Console()
-            handler = DeploymentHandler(console=console)
+            handler = DeploymentHandler(stdout=self.stdout, style=self.style)
 
             if subcommand == "setup":
                 handler.run_setup(options)
@@ -86,8 +84,10 @@ class Command(BaseCommand):
             elif subcommand == "status":
                 handler.check_status(options)
             else:
-                console.print(
-                    f"[red]Unknown deployment subcommand: {subcommand}[/red]"
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Unknown deployment subcommand: {subcommand}"
+                    )
                 )
         else:
-            Console().print(f"[red]Unknown command: {command}[/red]")
+            self.stdout.write(self.style.ERROR(f"Unknown command: {command}"))
