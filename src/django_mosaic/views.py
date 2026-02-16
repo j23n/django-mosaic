@@ -29,6 +29,7 @@ def post_detail(request, namespace, year, post_slug):
     post = get_object_or_404(
         Post, slug=post_slug, namespace__name=namespace, is_published=True
     )
+    post.content = post.published_content
 
     next_post = (
         Post.objects.filter(

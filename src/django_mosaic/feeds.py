@@ -25,7 +25,7 @@ class PostFeed(Feed):
         return item.title
 
     def item_description(self, item):
-        return markdownify(item.content)
+        return markdownify(item.published_content)
 
     def item_pubdate(self, item):
         return item.published_at

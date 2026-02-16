@@ -1,5 +1,6 @@
 import reversion
 from reversion.admin import VersionAdmin
+from reversion.models import Version
 
 from django.contrib import admin, messages
 from django.db import models
@@ -41,7 +42,35 @@ class ContentImageInlineAdmin(admin.TabularInline):
     copy_markdown_button.short_description = "Markdown"
 
 
+class PostAdminForm(forms.ModelForm):
+    published_version = forms.ChoiceField(
+        required=False,
+        label="Published revision",
+        help_text="Select which revision is shown on the public site.",
+    )
+
+    class Meta:
+        model = Post
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [("", "--- latest (no pinned revision) ---")]
+        if self.instance and self.instance.pk:
+            versions = Version.objects.get_for_object(self.instance)
+            for v in versions:
+                snippet = v.field_dict.get("content", "")[:60]
+                label = f"#{v.pk} — {v.revision.date_created:%Y-%m-%d %H:%M} — {snippet}"
+                choices.append((str(v.pk), label))
+        self.fields["published_version"].choices = choices
+        if self.instance and self.instance.published_version_id is not None:
+            self.fields["published_version"].initial = str(
+                self.instance.published_version_id
+            )
+
+
 class PostAdmin(VersionAdmin):
+    form = PostAdminForm
     readonly_fields = ["created_at", "draft_preview_link"]
     list_display = [
         "title",
@@ -64,6 +93,8 @@ class PostAdmin(VersionAdmin):
 
     inlines = [ContentImageInlineAdmin]
 
+    change_form_template = "admin/django_mosaic/post/change_form.html"
+
     def get_tags(self, obj):
         return ", ".join([t.name for t in obj.tags.all()])
 
@@ -75,23 +106,31 @@ class PostAdmin(VersionAdmin):
 
     draft_preview_link.short_description = "Draft preview"
 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if "_publish" in request.POST:
+            latest = Version.objects.get_for_object(obj).first()
+            if latest:
+                obj.published_version_id = latest.pk
+                obj.save(update_fields=["published_version_id"])
+        else:
+            chosen = form.cleaned_data.get("published_version")
+            obj.published_version_id = int(chosen) if chosen else None
+            obj.save(update_fields=["published_version_id"])
+
     @admin.action(description="Publish latest revision")
     def publish_revision(self, request, queryset):
         published = 0
         skipped = 0
         for post in queryset:
-            versions = reversion.models.Version.objects.get_for_object(post)
+            versions = Version.objects.get_for_object(post)
             if not versions.exists():
                 skipped += 1
                 continue
             latest = versions.first()
-            content = latest.field_dict.get("content", post.content)
-            if content == post.content:
-                skipped += 1
-                continue
-            post.content = content
+            post.published_version_id = latest.pk
             post.is_published = True
-            post.save(update_fields=["content", "is_published"])
+            post.save(update_fields=["published_version_id", "is_published"])
             published += 1
         if published:
             self.message_user(
@@ -102,7 +141,7 @@ class PostAdmin(VersionAdmin):
         if skipped:
             self.message_user(
                 request,
-                f"Skipped {skipped} post(s) (no new revision to publish).",
+                f"Skipped {skipped} post(s) (no revisions found).",
                 messages.WARNING,
             )
 
