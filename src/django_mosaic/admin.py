@@ -71,7 +71,8 @@ class PostAdminForm(forms.ModelForm):
 
 class PostAdmin(VersionAdmin):
     form = PostAdminForm
-    readonly_fields = ["created_at", "draft_preview_link"]
+    exclude = ["published_version_id"]
+    readonly_fields = ["created_at"]
     list_display = [
         "title",
         "is_published",
@@ -98,13 +99,14 @@ class PostAdmin(VersionAdmin):
     def get_tags(self, obj):
         return ", ".join([t.name for t in obj.tags.all()])
 
-    def draft_preview_link(self, obj):
-        if not obj.pk:
-            return ""
-        url = reverse("draft-detail", args=[obj.namespace.name, obj.secret_id])
-        return format_html('<a href="{}" target="_blank">Preview latest revision</a>', url)
-
-    draft_preview_link.short_description = "Draft preview"
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        extra_context = extra_context or {}
+        obj = self.get_object(request, object_id)
+        if obj:
+            extra_context["draft_preview_url"] = reverse(
+                "draft-detail", args=[obj.namespace.name, obj.secret_id]
+            )
+        return super().change_view(request, object_id, form_url, extra_context)
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
