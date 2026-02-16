@@ -1,5 +1,9 @@
 {% extends "admin/change_form.html" %}
+{% load i18n %}
 
 {% block submit_buttons_bottom %}
-{% include "admin/django_mosaic/post/submit_line.html" %}
+{{ block.super }}
+<div class="submit-row">
+    <input type="submit" value="{% translate 'Save and publish' %}" name="_publish" />
+</div>
 {% endblock %}
