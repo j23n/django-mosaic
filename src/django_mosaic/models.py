@@ -1,5 +1,6 @@
 import bleach
 import markdown
+import reversion
 import secrets
 from PIL import Image
 from io import BytesIO
@@ -130,11 +131,11 @@ class ContentImage(models.Model):
         )
 
 
+@reversion.register()
 class Post(models.Model):
     author = models.ForeignKey(Author, on_delete=models.PROTECT)
     title = models.CharField(max_length=512, blank=False, null=False)
     content = models.TextField()
-    draft_content = models.TextField(blank=True, null=True, default=None)
     slug = models.SlugField(max_length=256, blank=True, null=False, unique=True)
     summary = models.CharField(max_length=1024, null=False, blank=True)
 
@@ -186,10 +187,6 @@ class Post(models.Model):
         return super().save(*args, **kwargs)
 
     @property
-    def has_draft(self):
-        return self.draft_content is not None
-
-    @property
     def featured_image(self):
         return self.contentimage_set.filter(is_featured=True).first() or self.contentimage_set.first()
 
@@ -200,7 +197,7 @@ class Post(models.Model):
                 args=[self.namespace.name, self.published_at.year, self.slug],
             )
         else:
-            return reverse("draft-detail", args=[self.secret_id])
+            return reverse("draft-detail", args=[self.namespace.name, self.secret_id])
 
     def __str__(self):
         return f"{self.title}"

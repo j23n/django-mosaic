@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from reversion.models import Version
 from django_mosaic.models import Post, Tag, ContentImage
 
 
@@ -59,7 +60,11 @@ def post_detail(request, namespace, year, post_slug):
 def draft_detail(request, namespace, secret_id):
     post = get_object_or_404(Post, secret_id=secret_id)
 
-    display_content = post.draft_content if post.draft_content is not None else post.content
+    versions = Version.objects.get_for_object(post)
+    if versions.exists():
+        display_content = versions.first().field_dict.get("content", post.content)
+    else:
+        display_content = post.content
 
     response = render(
         request,

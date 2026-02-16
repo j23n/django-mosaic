@@ -1,3 +1,6 @@
+import reversion
+from reversion.admin import VersionAdmin
+
 from django.contrib import admin, messages
 from django.db import models
 from django import forms
@@ -38,19 +41,18 @@ class ContentImageInlineAdmin(admin.TabularInline):
     copy_markdown_button.short_description = "Markdown"
 
 
-class PostAdmin(admin.ModelAdmin):
+class PostAdmin(VersionAdmin):
     readonly_fields = ["created_at", "draft_preview_link"]
     list_display = [
         "title",
         "is_published",
-        "has_draft_indicator",
         "published_at",
         "namespace",
         "get_tags",
         "changed_at",
     ]
     list_filter = ["is_published", "namespace", "tags", "published_at"]
-    actions = ["publish_draft"]
+    actions = ["publish_revision"]
 
     formfield_overrides = {
         models.TextField: {
@@ -65,43 +67,42 @@ class PostAdmin(admin.ModelAdmin):
     def get_tags(self, obj):
         return ", ".join([t.name for t in obj.tags.all()])
 
-    def has_draft_indicator(self, obj):
-        return "Draft pending" if obj.has_draft else ""
-
-    has_draft_indicator.short_description = "Draft"
-
     def draft_preview_link(self, obj):
         if not obj.pk:
             return ""
-        if obj.has_draft:
-            url = reverse("draft-detail", args=[obj.namespace.name, obj.secret_id])
-            return format_html('<a href="{}" target="_blank">Preview draft</a>', url)
-        return "No draft pending"
+        url = reverse("draft-detail", args=[obj.namespace.name, obj.secret_id])
+        return format_html('<a href="{}" target="_blank">Preview latest revision</a>', url)
 
     draft_preview_link.short_description = "Draft preview"
 
-    @admin.action(description="Publish draft content")
-    def publish_draft(self, request, queryset):
+    @admin.action(description="Publish latest revision")
+    def publish_revision(self, request, queryset):
         published = 0
         skipped = 0
         for post in queryset:
-            if post.has_draft:
-                post.content = post.draft_content
-                post.draft_content = None
-                post.save(update_fields=["content", "draft_content"])
-                published += 1
-            else:
+            versions = reversion.models.Version.objects.get_for_object(post)
+            if not versions.exists():
                 skipped += 1
+                continue
+            latest = versions.first()
+            content = latest.field_dict.get("content", post.content)
+            if content == post.content:
+                skipped += 1
+                continue
+            post.content = content
+            post.is_published = True
+            post.save(update_fields=["content", "is_published"])
+            published += 1
         if published:
             self.message_user(
                 request,
-                f"Published draft content for {published} post(s).",
+                f"Published latest revision for {published} post(s).",
                 messages.SUCCESS,
             )
         if skipped:
             self.message_user(
                 request,
-                f"Skipped {skipped} post(s) with no draft content.",
+                f"Skipped {skipped} post(s) (no new revision to publish).",
                 messages.WARNING,
             )
 
