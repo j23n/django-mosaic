@@ -287,7 +287,8 @@ mark {
   background-color:var(--color-highlight);
   color:var(--color-tx-normal)
 }
-footer > .links {
+footer > .links,
+footer > .h-card {
   color:var(--color-tx-faint);
   font-size:var(--font-small);
 }
@@ -591,14 +592,12 @@ ul>li::marker {
 ul>li::marker {
   font-size:85%
 }
-@media (min-width: 600px) {
-  ul.list-plain {
-    padding-inline-start:0;
-    margin-left:0
-  }
-  ul.list-plain>li {
-    list-style:none
-  }
+ul.list-plain {
+  padding-inline-start:0;
+  margin-left:0
+}
+ul.list-plain>li {
+  list-style:none
 }
 @media (max-width: 600px) {
   ol>li,
@@ -674,10 +673,14 @@ label {
   padding:0 0 0.2em 0
 }
 .gallery-3,
+.gallery-6,
 .gallery-2 {
   display:grid;
   column-gap:0.5em;
   row-gap:0.5em;
+}
+.gallery-6 {
+  grid-template-columns:repeat(6, 1fr);
 }
 .gallery-3 {
   grid-template-columns:repeat(3, 1fr);
@@ -686,34 +689,26 @@ label {
   grid-template-columns:repeat(2, 1fr);
 }
 .gallery-2 > figure,
+.gallery-6 > figure,
 .gallery-3 > figure {
   padding: 0;
 }
 .gallery-2 > figure > figcaption,
+.gallery-6 > figure > figcaption,
 .gallery-3 > figure > figcaption {
   padding: 0 1em 1em 1em;
 }
 .gallery-3 img,
+.gallery-6 img,
 .gallery-2 img {
   object-fit: cover;
   width:100%;
   aspect-ratio:1/1;
 }
 .gallery-3 p,
+.gallery-6 p,
 .gallery-2 p,
 .gallery-3 img,
 .gallery-2 img {
   margin:0;
-}
-
-.post-nav {
-  display:grid;
-  gap:0.5em;
-  grid-template-columns:repeat(2, 1fr)
-}
-.post-nav .prev {
-
-}
-.post-nav .next {
-  text-align:right;
 }

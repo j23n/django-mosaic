@@ -45,14 +45,13 @@
 	<footer>
 		<hr />
 		<div class="post-nav links">
-			<div>
-			Subscribe with <a href="{% url 'feed' namespace %}">RSS</a>.
-			{% block footer_extra %}{% endblock %}
-			</div>
 			{% include "includes/hcard.html" %}
+			<ul class="list-plain">
+			<li>Subscribe with <a href="{% url 'feed' namespace %}">RSS</a>.</li>
+			<li>Made for the <a href="https://indieweb.org">indieweb</a> with <a href="https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD">Mosaic</a>.</li>
+			{% block footer_extra %}{% endblock %}
+			</ul>
 		</div>
-		<hr />
-		<div class="credit">Made for the <a href="https://indieweb.org">indieweb</a> with <a href="https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD">Mosaic</a>.</div>
 	</footer>
 	{% endblock %}
 </body>
