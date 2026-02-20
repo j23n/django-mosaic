@@ -1,0 +1,57 @@
+{
+  "project": {
+    "name": "Django Mosaic",
+    "policy_url": "https://j23n.com/public/posts/2026/my-ai-policy",
+    "date": "2026-02-20"
+  },
+  "tools": [
+    {
+      "name": "Claude Code (Anthropic)",
+      "model": "claude-sonnet-4-6",
+      "mode": "Agentic"
+    }
+  ],
+  "phases": [
+    {
+      "name": "Requirements & Scope",
+      "preset": "Human-led",
+      "human": 95,
+      "ai": 5
+    },
+    {
+      "name": "Architecture & Design",
+      "preset": "Human-led",
+      "human": 95,
+      "ai": 5
+    },
+    {
+      "name": "Implementation",
+      "preset": "AI-collaborative",
+      "human": 40,
+      "ai": 60
+    },
+    {
+      "name": "Testing",
+      "preset": "AI-generated",
+      "human": 5,
+      "ai": 95
+    },
+    {
+      "name": "Documentation",
+      "preset": "AI-collaborative",
+      "human": 40,
+      "ai": 60
+    }
+  ],
+  "oversight": {
+    "label": "Collaborative",
+    "description": "Human and AI co-author decisions; human reviews all output."
+  },
+  "process": "AI agent operated autonomously across multi-step tasks. Human reviewed diffs, resolved conflicts, and approved merges.",
+  "accountability": "The human author(s) are solely responsible for the content, accuracy, and fitness-for-purpose of this project.",
+  "output": {
+    "format": "html",
+    "filename": "ai_disclaimer.html",
+    "theme": "auto"
+  }
+}
