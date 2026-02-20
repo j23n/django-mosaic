@@ -330,11 +330,13 @@ dependencies = [
     { name = "django-reversion" },
     { name = "fabric" },
     { name = "pillow" },
+    { name = "pygments" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "black" },
+    { name = "pygments" },
     { name = "pytest" },
     { name = "pytest-django" },
     { name = "ruff" },
@@ -350,11 +352,13 @@ requires-dist = [
     { name = "django-reversion", specifier = ">=5.1.0" },
     { name = "fabric", specifier = ">=3.2.2" },
     { name = "pillow", specifier = ">=12.1.0" },
+    { name = "pygments", specifier = ">=2.19.2" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=26.1.0" },
+    { name = "pygments", specifier = ">=2.19.2" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-django", specifier = ">=4.11.1" },
     { name = "ruff", specifier = ">=0.14.13" },

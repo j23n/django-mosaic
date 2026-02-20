@@ -148,6 +148,16 @@ CONSTANTS = {
     }
 }
 
+MARKDOWNIFY = {
+    "default": {
+        "MARKDOWN_EXTENSIONS": [
+            "markdown.extensions.extra",
+            "markdown.extensions.codehilite",
+        ],
+        "BLEACH": False,
+    }
+}
+
 
 # Logging Configuration
 # https://docs.djangoproject.com/en/5.1/topics/logging/
