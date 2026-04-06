@@ -1,1 +1,8 @@
-<li class="h-entry"><a class="u-url plain" href="{{ post.get_absolute_url }}"><time class="dt-published" datetime="{{ post.published_at|date:'c' }}"><code class="meta">{{ post.published_at|date:'Y-m-d' }}</code></time> <span class="p-name">{{ post.title }}</span></a></li>
+<li class="h-entry{% if forloop.first %} h-entry--featured{% endif %}">
+  <time class="dt-published" datetime="{{ post.published_at|date:'c' }}"><code class="meta">{{ post.published_at|date:'Y-m-d' }}</code></time>
+  <div class="h-entry-body">
+    <a class="u-url h-entry-title p-name" href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+    {% if forloop.first and post.summary %}<p class="h-entry-summary e-summary">{{ post.summary }}</p>{% endif %}
+    {% if post.tags.all %}<div class="h-entry-tags">{% for t in post.tags.all %}<a href="{{ t.get_absolute_url }}" class="h-entry-tag p-category">{{ t.name }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+  </div>
+</li>

@@ -1,73 +1,226 @@
+/* ============================================================
+   PYGMENTS — Flexoki light theme (default)
+   Background: --flexoki-50 (#F2F0E5), warm off-white
+   Accent colors: Flexoki -600 variants for light backgrounds
+   ============================================================ */
+
 pre { line-height: 125%; }
-td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
-span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
-td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
-span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
-.codehilite .hll { background-color: #ffffcc }
-.codehilite { background: #ffffff; }
-.codehilite .c { color: #998; font-style: italic } /* Comment */
-.codehilite .err { color: #A61717; background-color: #E3D2D2 } /* Error */
-.codehilite .k { font-weight: bold } /* Keyword */
-.codehilite .o { font-weight: bold } /* Operator */
-.codehilite .ch { color: #998; font-style: italic } /* Comment.Hashbang */
-.codehilite .cm { color: #998; font-style: italic } /* Comment.Multiline */
-.codehilite .cp { color: #999; font-weight: bold } /* Comment.Preproc */
-.codehilite .cpf { color: #998; font-style: italic } /* Comment.PreprocFile */
-.codehilite .c1 { color: #998; font-style: italic } /* Comment.Single */
-.codehilite .cs { color: #999; font-weight: bold; font-style: italic } /* Comment.Special */
-.codehilite .gd { color: #000; background-color: #FDD } /* Generic.Deleted */
-.codehilite .ge { font-style: italic } /* Generic.Emph */
-.codehilite .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
-.codehilite .gr { color: #A00 } /* Generic.Error */
-.codehilite .gh { color: #999 } /* Generic.Heading */
-.codehilite .gi { color: #000; background-color: #DFD } /* Generic.Inserted */
-.codehilite .go { color: #888 } /* Generic.Output */
-.codehilite .gp { color: #555 } /* Generic.Prompt */
-.codehilite .gs { font-weight: bold } /* Generic.Strong */
-.codehilite .gu { color: #AAA } /* Generic.Subheading */
-.codehilite .gt { color: #A00 } /* Generic.Traceback */
-.codehilite .kc { font-weight: bold } /* Keyword.Constant */
-.codehilite .kd { font-weight: bold } /* Keyword.Declaration */
-.codehilite .kn { font-weight: bold } /* Keyword.Namespace */
-.codehilite .kp { font-weight: bold } /* Keyword.Pseudo */
-.codehilite .kr { font-weight: bold } /* Keyword.Reserved */
-.codehilite .kt { color: #458; font-weight: bold } /* Keyword.Type */
-.codehilite .m { color: #099 } /* Literal.Number */
-.codehilite .s { color: #B84 } /* Literal.String */
-.codehilite .na { color: #008080 } /* Name.Attribute */
-.codehilite .nb { color: #999 } /* Name.Builtin */
-.codehilite .nc { color: #458; font-weight: bold } /* Name.Class */
-.codehilite .no { color: #008080 } /* Name.Constant */
-.codehilite .ni { color: #800080 } /* Name.Entity */
-.codehilite .ne { color: #900; font-weight: bold } /* Name.Exception */
-.codehilite .nf { color: #900; font-weight: bold } /* Name.Function */
-.codehilite .nn { color: #555 } /* Name.Namespace */
-.codehilite .nt { color: #000080 } /* Name.Tag */
-.codehilite .nv { color: #008080 } /* Name.Variable */
-.codehilite .ow { font-weight: bold } /* Operator.Word */
-.codehilite .w { color: #BBB } /* Text.Whitespace */
-.codehilite .mb { color: #099 } /* Literal.Number.Bin */
-.codehilite .mf { color: #099 } /* Literal.Number.Float */
-.codehilite .mh { color: #099 } /* Literal.Number.Hex */
-.codehilite .mi { color: #099 } /* Literal.Number.Integer */
-.codehilite .mo { color: #099 } /* Literal.Number.Oct */
-.codehilite .sa { color: #B84 } /* Literal.String.Affix */
-.codehilite .sb { color: #B84 } /* Literal.String.Backtick */
-.codehilite .sc { color: #B84 } /* Literal.String.Char */
-.codehilite .dl { color: #B84 } /* Literal.String.Delimiter */
-.codehilite .sd { color: #B84 } /* Literal.String.Doc */
-.codehilite .s2 { color: #B84 } /* Literal.String.Double */
-.codehilite .se { color: #B84 } /* Literal.String.Escape */
-.codehilite .sh { color: #B84 } /* Literal.String.Heredoc */
-.codehilite .si { color: #B84 } /* Literal.String.Interpol */
-.codehilite .sx { color: #B84 } /* Literal.String.Other */
-.codehilite .sr { color: #808000 } /* Literal.String.Regex */
-.codehilite .s1 { color: #B84 } /* Literal.String.Single */
-.codehilite .ss { color: #B84 } /* Literal.String.Symbol */
-.codehilite .bp { color: #999 } /* Name.Builtin.Pseudo */
-.codehilite .fm { color: #900; font-weight: bold } /* Name.Function.Magic */
-.codehilite .vc { color: #008080 } /* Name.Variable.Class */
-.codehilite .vg { color: #008080 } /* Name.Variable.Global */
-.codehilite .vi { color: #008080 } /* Name.Variable.Instance */
-.codehilite .vm { color: #008080 } /* Name.Variable.Magic */
-.codehilite .il { color: #099 } /* Literal.Number.Integer.Long */
+td.linenos .normal { color: var(--flexoki-400); background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: var(--flexoki-400); background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: var(--flexoki-700); background-color: var(--flexoki-100); padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: var(--flexoki-700); background-color: var(--flexoki-100); padding-left: 5px; padding-right: 5px; }
+
+.codehilite .hll { background-color: var(--flexoki-yellow-100) }
+.codehilite      { background: var(--flexoki-50) }
+.codehilite .c   { color: var(--flexoki-500); font-style: italic }                /* Comment */
+.codehilite .err { color: var(--flexoki-red-600) }                                /* Error */
+.codehilite .k   { color: var(--flexoki-orange-600); font-weight: bold }          /* Keyword */
+.codehilite .o   { color: var(--flexoki-700) }                                    /* Operator */
+.codehilite .ch  { color: var(--flexoki-500); font-style: italic }                /* Comment.Hashbang */
+.codehilite .cm  { color: var(--flexoki-500); font-style: italic }                /* Comment.Multiline */
+.codehilite .cp  { color: var(--flexoki-500) }                                    /* Comment.Preproc */
+.codehilite .cpf { color: var(--flexoki-500); font-style: italic }                /* Comment.PreprocFile */
+.codehilite .c1  { color: var(--flexoki-500); font-style: italic }                /* Comment.Single */
+.codehilite .cs  { color: var(--flexoki-500); font-style: italic }                /* Comment.Special */
+.codehilite .gd  { color: var(--flexoki-red-700); background-color: var(--flexoki-red-50) }   /* Generic.Deleted */
+.codehilite .ge  { font-style: italic }                                           /* Generic.Emph */
+.codehilite .ges { font-weight: bold; font-style: italic }                        /* Generic.EmphStrong */
+.codehilite .gr  { color: var(--flexoki-red-600) }                                /* Generic.Error */
+.codehilite .gh  { color: var(--flexoki-600) }                                    /* Generic.Heading */
+.codehilite .gi  { color: var(--flexoki-green-700); background-color: var(--flexoki-green-50) } /* Generic.Inserted */
+.codehilite .go  { color: var(--flexoki-600) }                                    /* Generic.Output */
+.codehilite .gp  { color: var(--flexoki-500) }                                    /* Generic.Prompt */
+.codehilite .gs  { font-weight: bold }                                            /* Generic.Strong */
+.codehilite .gu  { color: var(--flexoki-500) }                                    /* Generic.Subheading */
+.codehilite .gt  { color: var(--flexoki-red-600) }                                /* Generic.Traceback */
+.codehilite .kc  { color: var(--flexoki-orange-600); font-weight: bold }          /* Keyword.Constant */
+.codehilite .kd  { color: var(--flexoki-orange-600); font-weight: bold }          /* Keyword.Declaration */
+.codehilite .kn  { color: var(--flexoki-orange-600); font-weight: bold }          /* Keyword.Namespace */
+.codehilite .kp  { color: var(--flexoki-orange-600) }                             /* Keyword.Pseudo */
+.codehilite .kr  { color: var(--flexoki-orange-600); font-weight: bold }          /* Keyword.Reserved */
+.codehilite .kt  { color: var(--flexoki-purple-600); font-weight: bold }          /* Keyword.Type */
+.codehilite .m   { color: var(--flexoki-purple-600) }                             /* Literal.Number */
+.codehilite .s   { color: var(--flexoki-green-600) }                              /* Literal.String */
+.codehilite .na  { color: var(--flexoki-cyan-700) }                               /* Name.Attribute */
+.codehilite .nb  { color: var(--flexoki-blue-700) }                               /* Name.Builtin */
+.codehilite .nc  { color: var(--flexoki-cyan-600); font-weight: bold }            /* Name.Class */
+.codehilite .no  { color: var(--flexoki-cyan-700) }                               /* Name.Constant */
+.codehilite .ni  { color: var(--flexoki-700) }                                    /* Name.Entity */
+.codehilite .ne  { color: var(--flexoki-red-600); font-weight: bold }             /* Name.Exception */
+.codehilite .nf  { color: var(--flexoki-cyan-600); font-weight: bold }            /* Name.Function */
+.codehilite .nn  { color: var(--flexoki-600) }                                    /* Name.Namespace */
+.codehilite .nt  { color: var(--flexoki-blue-600) }                               /* Name.Tag */
+.codehilite .nv  { color: var(--flexoki-blue-700) }                               /* Name.Variable */
+.codehilite .ow  { color: var(--flexoki-orange-600) }                             /* Operator.Word */
+.codehilite .w   { color: var(--flexoki-300) }                                    /* Text.Whitespace */
+.codehilite .mb  { color: var(--flexoki-purple-600) }                             /* Literal.Number.Bin */
+.codehilite .mf  { color: var(--flexoki-purple-600) }                             /* Literal.Number.Float */
+.codehilite .mh  { color: var(--flexoki-purple-600) }                             /* Literal.Number.Hex */
+.codehilite .mi  { color: var(--flexoki-purple-600) }                             /* Literal.Number.Integer */
+.codehilite .mo  { color: var(--flexoki-purple-600) }                             /* Literal.Number.Oct */
+.codehilite .sa  { color: var(--flexoki-green-600) }                              /* Literal.String.Affix */
+.codehilite .sb  { color: var(--flexoki-green-600) }                              /* Literal.String.Backtick */
+.codehilite .sc  { color: var(--flexoki-green-600) }                              /* Literal.String.Char */
+.codehilite .dl  { color: var(--flexoki-green-600) }                              /* Literal.String.Delimiter */
+.codehilite .sd  { color: var(--flexoki-green-700); font-style: italic }          /* Literal.String.Doc */
+.codehilite .s2  { color: var(--flexoki-green-600) }                              /* Literal.String.Double */
+.codehilite .se  { color: var(--flexoki-orange-700) }                             /* Literal.String.Escape */
+.codehilite .sh  { color: var(--flexoki-green-600) }                              /* Literal.String.Heredoc */
+.codehilite .si  { color: var(--flexoki-orange-600) }                             /* Literal.String.Interpol */
+.codehilite .sx  { color: var(--flexoki-green-600) }                              /* Literal.String.Other */
+.codehilite .sr  { color: var(--flexoki-red-600) }                                /* Literal.String.Regex */
+.codehilite .s1  { color: var(--flexoki-green-600) }                              /* Literal.String.Single */
+.codehilite .ss  { color: var(--flexoki-green-700) }                              /* Literal.String.Symbol */
+.codehilite .bp  { color: var(--flexoki-blue-700) }                               /* Name.Builtin.Pseudo */
+.codehilite .fm  { color: var(--flexoki-cyan-600); font-weight: bold }            /* Name.Function.Magic */
+.codehilite .vc  { color: var(--flexoki-blue-700) }                               /* Name.Variable.Class */
+.codehilite .vg  { color: var(--flexoki-blue-700) }                               /* Name.Variable.Global */
+.codehilite .vi  { color: var(--flexoki-blue-700) }                               /* Name.Variable.Instance */
+.codehilite .vm  { color: var(--flexoki-blue-700) }                               /* Name.Variable.Magic */
+.codehilite .il  { color: var(--flexoki-purple-600) }                             /* Literal.Number.Integer.Long */
+
+/* ============================================================
+   PYGMENTS — Flexoki dark theme
+   Background: --flexoki-950 (inherited from pre in dark mode)
+   Accent colors: Flexoki -300 variants for dark backgrounds
+   ============================================================ */
+
+@media (prefers-color-scheme: dark) {
+  .codehilite .hll { background-color: var(--flexoki-yellow-900) }
+  .codehilite      { background: var(--flexoki-950) }
+  .codehilite .c   { color: var(--flexoki-500); font-style: italic }              /* Comment */
+  .codehilite .err { color: var(--flexoki-red-300) }                              /* Error */
+  .codehilite .k   { color: var(--flexoki-orange-300); font-weight: bold }        /* Keyword */
+  .codehilite .o   { color: var(--flexoki-400) }                                  /* Operator */
+  .codehilite .ch  { color: var(--flexoki-500); font-style: italic }              /* Comment.Hashbang */
+  .codehilite .cm  { color: var(--flexoki-500); font-style: italic }              /* Comment.Multiline */
+  .codehilite .cp  { color: var(--flexoki-500) }                                  /* Comment.Preproc */
+  .codehilite .cpf { color: var(--flexoki-500); font-style: italic }              /* Comment.PreprocFile */
+  .codehilite .c1  { color: var(--flexoki-500); font-style: italic }              /* Comment.Single */
+  .codehilite .cs  { color: var(--flexoki-500); font-style: italic }              /* Comment.Special */
+  .codehilite .gd  { color: var(--flexoki-red-300); background-color: var(--flexoki-red-950) }  /* Generic.Deleted */
+  .codehilite .ge  { font-style: italic }                                         /* Generic.Emph */
+  .codehilite .ges { font-weight: bold; font-style: italic }                      /* Generic.EmphStrong */
+  .codehilite .gr  { color: var(--flexoki-red-300) }                              /* Generic.Error */
+  .codehilite .gh  { color: var(--flexoki-400) }                                  /* Generic.Heading */
+  .codehilite .gi  { color: var(--flexoki-green-300); background-color: var(--flexoki-green-950) } /* Generic.Inserted */
+  .codehilite .go  { color: var(--flexoki-500) }                                  /* Generic.Output */
+  .codehilite .gp  { color: var(--flexoki-500) }                                  /* Generic.Prompt */
+  .codehilite .gs  { font-weight: bold }                                          /* Generic.Strong */
+  .codehilite .gu  { color: var(--flexoki-500) }                                  /* Generic.Subheading */
+  .codehilite .gt  { color: var(--flexoki-red-300) }                              /* Generic.Traceback */
+  .codehilite .kc  { color: var(--flexoki-orange-300); font-weight: bold }        /* Keyword.Constant */
+  .codehilite .kd  { color: var(--flexoki-orange-300); font-weight: bold }        /* Keyword.Declaration */
+  .codehilite .kn  { color: var(--flexoki-orange-300); font-weight: bold }        /* Keyword.Namespace */
+  .codehilite .kp  { color: var(--flexoki-orange-300) }                           /* Keyword.Pseudo */
+  .codehilite .kr  { color: var(--flexoki-orange-300); font-weight: bold }        /* Keyword.Reserved */
+  .codehilite .kt  { color: var(--flexoki-purple-300); font-weight: bold }        /* Keyword.Type */
+  .codehilite .m   { color: var(--flexoki-purple-300) }                           /* Literal.Number */
+  .codehilite .s   { color: var(--flexoki-green-300) }                            /* Literal.String */
+  .codehilite .na  { color: var(--flexoki-cyan-300) }                             /* Name.Attribute */
+  .codehilite .nb  { color: var(--flexoki-blue-300) }                             /* Name.Builtin */
+  .codehilite .nc  { color: var(--flexoki-cyan-300); font-weight: bold }          /* Name.Class */
+  .codehilite .no  { color: var(--flexoki-cyan-300) }                             /* Name.Constant */
+  .codehilite .ni  { color: var(--flexoki-400) }                                  /* Name.Entity */
+  .codehilite .ne  { color: var(--flexoki-red-300); font-weight: bold }           /* Name.Exception */
+  .codehilite .nf  { color: var(--flexoki-cyan-300); font-weight: bold }          /* Name.Function */
+  .codehilite .nn  { color: var(--flexoki-400) }                                  /* Name.Namespace */
+  .codehilite .nt  { color: var(--flexoki-blue-300) }                             /* Name.Tag */
+  .codehilite .nv  { color: var(--flexoki-blue-300) }                             /* Name.Variable */
+  .codehilite .ow  { color: var(--flexoki-orange-300) }                           /* Operator.Word */
+  .codehilite .w   { color: var(--flexoki-700) }                                  /* Text.Whitespace */
+  .codehilite .mb  { color: var(--flexoki-purple-300) }                           /* Literal.Number.Bin */
+  .codehilite .mf  { color: var(--flexoki-purple-300) }                           /* Literal.Number.Float */
+  .codehilite .mh  { color: var(--flexoki-purple-300) }                           /* Literal.Number.Hex */
+  .codehilite .mi  { color: var(--flexoki-purple-300) }                           /* Literal.Number.Integer */
+  .codehilite .mo  { color: var(--flexoki-purple-300) }                           /* Literal.Number.Oct */
+  .codehilite .sa  { color: var(--flexoki-green-300) }                            /* Literal.String.Affix */
+  .codehilite .sb  { color: var(--flexoki-green-300) }                            /* Literal.String.Backtick */
+  .codehilite .sc  { color: var(--flexoki-green-300) }                            /* Literal.String.Char */
+  .codehilite .dl  { color: var(--flexoki-green-300) }                            /* Literal.String.Delimiter */
+  .codehilite .sd  { color: var(--flexoki-green-400); font-style: italic }        /* Literal.String.Doc */
+  .codehilite .s2  { color: var(--flexoki-green-300) }                            /* Literal.String.Double */
+  .codehilite .se  { color: var(--flexoki-orange-300) }                           /* Literal.String.Escape */
+  .codehilite .sh  { color: var(--flexoki-green-300) }                            /* Literal.String.Heredoc */
+  .codehilite .si  { color: var(--flexoki-orange-300) }                           /* Literal.String.Interpol */
+  .codehilite .sx  { color: var(--flexoki-green-300) }                            /* Literal.String.Other */
+  .codehilite .sr  { color: var(--flexoki-red-300) }                              /* Literal.String.Regex */
+  .codehilite .s1  { color: var(--flexoki-green-300) }                            /* Literal.String.Single */
+  .codehilite .ss  { color: var(--flexoki-green-400) }                            /* Literal.String.Symbol */
+  .codehilite .bp  { color: var(--flexoki-blue-300) }                             /* Name.Builtin.Pseudo */
+  .codehilite .fm  { color: var(--flexoki-cyan-300); font-weight: bold }          /* Name.Function.Magic */
+  .codehilite .vc  { color: var(--flexoki-blue-300) }                             /* Name.Variable.Class */
+  .codehilite .vg  { color: var(--flexoki-blue-300) }                             /* Name.Variable.Global */
+  .codehilite .vi  { color: var(--flexoki-blue-300) }                             /* Name.Variable.Instance */
+  .codehilite .vm  { color: var(--flexoki-blue-300) }                             /* Name.Variable.Magic */
+  .codehilite .il  { color: var(--flexoki-purple-300) }                           /* Literal.Number.Integer.Long */
+}
+
+.theme-dark .codehilite .hll { background-color: var(--flexoki-yellow-900) }
+.theme-dark .codehilite      { background: var(--flexoki-950) }
+.theme-dark .codehilite .c   { color: var(--flexoki-500); font-style: italic }
+.theme-dark .codehilite .err { color: var(--flexoki-red-300) }
+.theme-dark .codehilite .k   { color: var(--flexoki-orange-300); font-weight: bold }
+.theme-dark .codehilite .o   { color: var(--flexoki-400) }
+.theme-dark .codehilite .ch  { color: var(--flexoki-500); font-style: italic }
+.theme-dark .codehilite .cm  { color: var(--flexoki-500); font-style: italic }
+.theme-dark .codehilite .cp  { color: var(--flexoki-500) }
+.theme-dark .codehilite .cpf { color: var(--flexoki-500); font-style: italic }
+.theme-dark .codehilite .c1  { color: var(--flexoki-500); font-style: italic }
+.theme-dark .codehilite .cs  { color: var(--flexoki-500); font-style: italic }
+.theme-dark .codehilite .gd  { color: var(--flexoki-red-300); background-color: var(--flexoki-red-950) }
+.theme-dark .codehilite .ge  { font-style: italic }
+.theme-dark .codehilite .ges { font-weight: bold; font-style: italic }
+.theme-dark .codehilite .gr  { color: var(--flexoki-red-300) }
+.theme-dark .codehilite .gh  { color: var(--flexoki-400) }
+.theme-dark .codehilite .gi  { color: var(--flexoki-green-300); background-color: var(--flexoki-green-950) }
+.theme-dark .codehilite .go  { color: var(--flexoki-500) }
+.theme-dark .codehilite .gp  { color: var(--flexoki-500) }
+.theme-dark .codehilite .gs  { font-weight: bold }
+.theme-dark .codehilite .gu  { color: var(--flexoki-500) }
+.theme-dark .codehilite .gt  { color: var(--flexoki-red-300) }
+.theme-dark .codehilite .kc  { color: var(--flexoki-orange-300); font-weight: bold }
+.theme-dark .codehilite .kd  { color: var(--flexoki-orange-300); font-weight: bold }
+.theme-dark .codehilite .kn  { color: var(--flexoki-orange-300); font-weight: bold }
+.theme-dark .codehilite .kp  { color: var(--flexoki-orange-300) }
+.theme-dark .codehilite .kr  { color: var(--flexoki-orange-300); font-weight: bold }
+.theme-dark .codehilite .kt  { color: var(--flexoki-purple-300); font-weight: bold }
+.theme-dark .codehilite .m   { color: var(--flexoki-purple-300) }
+.theme-dark .codehilite .s   { color: var(--flexoki-green-300) }
+.theme-dark .codehilite .na  { color: var(--flexoki-cyan-300) }
+.theme-dark .codehilite .nb  { color: var(--flexoki-blue-300) }
+.theme-dark .codehilite .nc  { color: var(--flexoki-cyan-300); font-weight: bold }
+.theme-dark .codehilite .no  { color: var(--flexoki-cyan-300) }
+.theme-dark .codehilite .ni  { color: var(--flexoki-400) }
+.theme-dark .codehilite .ne  { color: var(--flexoki-red-300); font-weight: bold }
+.theme-dark .codehilite .nf  { color: var(--flexoki-cyan-300); font-weight: bold }
+.theme-dark .codehilite .nn  { color: var(--flexoki-400) }
+.theme-dark .codehilite .nt  { color: var(--flexoki-blue-300) }
+.theme-dark .codehilite .nv  { color: var(--flexoki-blue-300) }
+.theme-dark .codehilite .ow  { color: var(--flexoki-orange-300) }
+.theme-dark .codehilite .w   { color: var(--flexoki-700) }
+.theme-dark .codehilite .mb  { color: var(--flexoki-purple-300) }
+.theme-dark .codehilite .mf  { color: var(--flexoki-purple-300) }
+.theme-dark .codehilite .mh  { color: var(--flexoki-purple-300) }
+.theme-dark .codehilite .mi  { color: var(--flexoki-purple-300) }
+.theme-dark .codehilite .mo  { color: var(--flexoki-purple-300) }
+.theme-dark .codehilite .sa  { color: var(--flexoki-green-300) }
+.theme-dark .codehilite .sb  { color: var(--flexoki-green-300) }
+.theme-dark .codehilite .sc  { color: var(--flexoki-green-300) }
+.theme-dark .codehilite .dl  { color: var(--flexoki-green-300) }
+.theme-dark .codehilite .sd  { color: var(--flexoki-green-400); font-style: italic }
+.theme-dark .codehilite .s2  { color: var(--flexoki-green-300) }
+.theme-dark .codehilite .se  { color: var(--flexoki-orange-300) }
+.theme-dark .codehilite .sh  { color: var(--flexoki-green-300) }
+.theme-dark .codehilite .si  { color: var(--flexoki-orange-300) }
+.theme-dark .codehilite .sx  { color: var(--flexoki-green-300) }
+.theme-dark .codehilite .sr  { color: var(--flexoki-red-300) }
+.theme-dark .codehilite .s1  { color: var(--flexoki-green-300) }
+.theme-dark .codehilite .ss  { color: var(--flexoki-green-400) }
+.theme-dark .codehilite .bp  { color: var(--flexoki-blue-300) }
+.theme-dark .codehilite .fm  { color: var(--flexoki-cyan-300); font-weight: bold }
+.theme-dark .codehilite .vc  { color: var(--flexoki-blue-300) }
+.theme-dark .codehilite .vg  { color: var(--flexoki-blue-300) }
+.theme-dark .codehilite .vi  { color: var(--flexoki-blue-300) }
+.theme-dark .codehilite .vm  { color: var(--flexoki-blue-300) }
+.theme-dark .codehilite .il  { color: var(--flexoki-purple-300) }

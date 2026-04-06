@@ -4,6 +4,8 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="preload" href="{% static 'mosaic/fonts/plusjakartasans-latin-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+	<link rel="preload" href="{% static 'mosaic/fonts/fraunces-latin-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
 	{% block stylesheet %}
 	<link rel="stylesheet" href="{% static 'mosaic/css/style.css' %}">
 	<link rel="stylesheet" href="{% static 'mosaic/css/pygments.css' %}">

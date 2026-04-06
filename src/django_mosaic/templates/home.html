@@ -17,8 +17,8 @@
 <hr />
 
 <h2>Topics</h2>
-{% for t in tags %}
-<a href="{{ t.get_absolute_url }}">{{ t.name }}</a>{% if not forloop.last %}, {% endif %}
-{% endfor %}
+<div class="topic-list">
+{% for t in tags %}<a href="{{ t.get_absolute_url }}">{{ t.name }}</a>{% endfor %}
+</div>
 
 {% endblock %}
