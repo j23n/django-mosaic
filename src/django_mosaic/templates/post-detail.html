@@ -32,16 +32,18 @@
 {% if is_draft %}
 <div class="draft-banner"><strong>Draft preview</strong> — this content has not been published.</div>
 {% endif %}
-<article class="h-entry">
+<article class="h-entry post-detail">
+<div class="post-detail-header">
 <hgroup>
 <h1 class="p-name">{{ post.title }}</h1>
 <small>
 Written on
 <time class="dt-published" datetime="{{ post.published_at|date:'c' }}">{{ post.published_at|date:'Y-m-d' }}</time>
-by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.username }}</a>
-{% if post.tags %} in {% for t in post.tags.all %}<a class="p-category" href="{{ t.get_absolute_url }}">{{ t.name }}</a> {% endfor %}{% endif %}
+by <a class="muted p-author h-card" href="{% url 'home' %}">{{ post.author.user.username }}</a>
+{% if post.tags %} in {% for t in post.tags.all %}<a class="muted p-category" href="{{ t.get_absolute_url }}">{{ t.name }}</a> {% endfor %}{% endif %}
 </small>
 </hgroup>
+</div>
 <a class="u-url" href="{{ post.get_absolute_url }}" hidden></a>
 {% if post.featured_image %}
 <img class="u-photo" src="{{ post.featured_image.image.url }}" alt="{{ post.featured_image.alt }}" hidden>
@@ -52,10 +54,7 @@ by <a class="p-author h-card" href="{% url 'home' %}">{{ post.author.user.userna
 <div class="e-content">
 {{ post.content|markdownify }}
 </div>
-
 </article>
-
-<hr>
 
 <div class="post-nav">
 <div class="prev">{% if prev_post %}Previous: <a href="{{ prev_post.get_absolute_url }}" class="muted">{{ prev_post.title|truncatechars:20 }}</a>{% else %}This was the last post{% endif %}</div>

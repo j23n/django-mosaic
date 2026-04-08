@@ -4,7 +4,6 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="preload" href="{% static 'mosaic/fonts/plusjakartasans-latin-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
 	<link rel="preload" href="{% static 'mosaic/fonts/fraunces-latin-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
 	{% block stylesheet %}
 	<link rel="stylesheet" href="{% static 'mosaic/css/style.css' %}">
@@ -46,14 +45,15 @@
 		{% block content %}{% endblock %}
 	</main>
 	<footer>
-		<hr />
-		<div class="links">
+		<div class="footer-inner">
 			{% include "includes/hcard.html" %}
-			<ul class="list-plain">
-			<li>Subscribe with <a href="{% url 'feed' namespace %}">RSS</a>.</li>
-			<li>Made for the <a href="https://indieweb.org">indieweb</a> with <a href="https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD">Mosaic</a>.</li>
-			{% block footer_extra %}{% endblock %}
-			</ul>
+			<div class="footer-links">
+				<ul class="list-plain">
+				<li>Subscribe with <a href="{% url 'feed' namespace %}" class="muted">RSS</a>.</li>
+				<li>Made for the <a href="https://indieweb.org" class="muted">indieweb</a> with <a href="https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD" class="muted">Mosaic</a>.</li>
+				{% block footer_extra %}{% endblock %}
+				</ul>
+			</div>
 		</div>
 	</footer>
 	{% endblock %}

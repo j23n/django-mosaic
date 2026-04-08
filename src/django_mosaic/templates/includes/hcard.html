@@ -1,17 +1,17 @@
 {% if author %}
 <div class="h-card">
 	{% if author.photo_url %}<img class="u-photo" hidden src="{{ author.photo_url }}" alt="{{ author.display_name }}">{% endif %}
-	{% if author.url and author.display_name %}<a class="p-name u-url" href="{{ author.url }}">{{ author.display_name }}</a>
+	{% if author.url and author.display_name %}<a class="muted p-name u-url" href="{{ author.url }}">{{ author.display_name }}</a>
 	{% elif author.display_name %}<span class="p-name">{{ author.display_name }}</span>
-	{% elif author.url %}<a class="u-url" href="{{ author.url }}">{{ author.url }}</a>
+	{% elif author.url %}<a class="muted u-url" href="{{ author.url }}">{{ author.url }}</a>
 	{% endif %}
 	{% if author.note %}<p class="p-note">{{ author.note }}</p>{% endif %}
-	{% if author.email %}<br>Write me: <a class="u-email" href="mailto:{{ author.email }}">{{ author.email }}</a>{% endif %}
+	{% if author.email %}<br>Write me: <a class="muted u-email" href="mailto:{{ author.email }}">{{ author.email }}</a>{% endif %}
 	{% if author.rel_me_links.all %}
 	<br>
 	Find me on: 
 	{% for link in author.rel_me_links.all %}
-	<a rel="me" href="{{ link.url }}">{{ link.label|default:link.url }}</a>{% if not forloop.last %} · {% endif %}
+	<a rel="me" href="{{ link.url }}" class="muted">{{ link.label|default:link.url }}</a>{% if not forloop.last %} · {% endif %}
 	{% endfor %}
 	{% endif %}
 </div>
