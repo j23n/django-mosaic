@@ -66,6 +66,6 @@ document.querySelectorAll('.e-content figcaption').forEach(fc => {
     const a = fc.parentElement.querySelector('a');
     if (a) a.dataset.description = fc.textContent;
 });
-GLightbox({ selector: '.e-content a', touchNavigation: true, loop: true });
+GLightbox({ selector: '.e-content a:has(img)', touchNavigation: true, loop: true });
 </script>
 {% endblock %}
