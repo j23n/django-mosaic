@@ -3,7 +3,7 @@ import markdown
 import reversion
 from reversion.models import Version
 import secrets
-from PIL import Image
+from PIL import Image, ImageOps
 from io import BytesIO
 import os
 import logging
@@ -80,32 +80,38 @@ class ContentImage(models.Model):
         return f"<Image {self.image} [{self.alt[:50]}]>"
 
     def save(self, *args, **kwargs):
-        # Only generate thumbnail on creation
+        # Only process image on creation
         if not self.pk and self.image:
             try:
-                # Generate random filename
-                ext = self.image.name.split(".")[-1]
                 random_name = secrets.token_hex(32)
-                new_filename = f"{random_name}.{ext}"
 
-                # Rename the image file
-                self.image.name = new_filename
-
-                # Generate thumbnail
                 img = Image.open(self.image.file)
+                # Fix orientation based on EXIF data
+                img = ImageOps.exif_transpose(img)
+
+                # Resize main image to max 2048px on longest side (never upscales)
+                img.thumbnail((2048, 2048), Image.Resampling.LANCZOS)
+
+                # Save main image as JPEG
+                main_io = BytesIO()
+                img.save(main_io, format="JPEG", quality=90, optimize=True)
+                main_io.seek(0)
+                new_filename = f"{random_name}.jpg"
+                self.image.save(
+                    new_filename, ContentFile(main_io.read()), save=False
+                )
+
+                # Generate thumbnail (never upscales)
                 img.thumbnail((600, 600), Image.Resampling.LANCZOS)
-
                 thumb_io = BytesIO()
-                img.save(thumb_io, format="PNG", quality=85)
+                img.save(thumb_io, format="JPEG", quality=90, optimize=True)
                 thumb_io.seek(0)
-
-                # Save thumbnail with _thumb suffix
-                thumb_filename = f"{random_name}_thumb.{ext}"
+                thumb_filename = f"{random_name}_thumb.jpg"
                 self.thumb.save(
                     thumb_filename, ContentFile(thumb_io.read()), save=False
                 )
             except (OSError, ValueError) as e:
-                logger.warning(f"Failed to create thumbnail: {e}")
+                logger.warning(f"Failed to process image: {e}")
 
         super().save(*args, **kwargs)
 

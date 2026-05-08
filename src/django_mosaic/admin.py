@@ -15,6 +15,15 @@ class ContentImageInlineAdmin(admin.TabularInline):
     readonly_fields = ["thumb", "thumbnail_preview", "copy_markdown_button"]
     fields = ["image", "thumbnail_preview", "caption", "alt", "is_featured", "copy_markdown_button"]
 
+    formfield_overrides = {
+        models.CharField: {
+            "widget": forms.Textarea(attrs={"rows": 3, "style": "width: 100%"}),
+        },
+    }
+
+    class Media:
+        css = {"all": ("mosaic/css/admin_inline.css",)}
+
     def thumbnail_preview(self, obj):
         if obj.thumb:
             return format_html(

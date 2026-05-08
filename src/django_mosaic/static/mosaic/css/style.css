@@ -300,6 +300,7 @@ a { color:var(--color-tx-normal); text-decoration:underline }
 a:hover { color:var(--color-action); border-color:var(--color-action) }
 a:focus { outline:none; background-color:var(--color-bg-hover) }
 a.muted { color:var(--color-tx-muted); text-decoration:none }
+a.muted:hover { color:var(--color-action) }
 
 /* ============================================================
    IMAGES & MEDIA
@@ -525,8 +526,6 @@ footer {
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:1.5em;
-  max-width:var(--wrap-normal);
-  margin:0 auto;
   font-size:var(--font-small);
   color:var(--color-tx-muted)
 }
@@ -534,7 +533,7 @@ footer {
 .footer-links { text-align:right }
 .footer-links .list-plain li { padding:0.1rem 0 }
 @media (max-width: 600px) {
-  .footer-inner { grid-template-columns:1fr; gap:1em; padding:0 1em }
+  .footer-inner { grid-template-columns:1fr; gap:1em }
   .footer-links { text-align:left }
 }
 
