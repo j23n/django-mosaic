@@ -58,7 +58,7 @@ textarea { overflow:auto }
    ============================================================ */
 :root {
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
-  --font-content: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-content: 'Courier New', Courier, var(--font-mono);
   --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", "IBM Plex Mono", "Roboto Mono", "DejaVu Sans Mono", "Liberation Mono", Menlo, Monaco, "Consolas", "Source Code Pro", monospace;
   --border-radius: 4px;
   --font-small: 0.875em;
@@ -164,7 +164,8 @@ textarea { overflow:auto }
   --color-highlight: var(--flexoki-yellow-100);
   --color-action: var(--flexoki-green-600);
   --color-bg-hover: var(--flexoki-green-50);
-  --color-selection: rgba(190,201,126,0.3)
+  --color-selection: rgba(190,201,126,0.3);
+  --color-heading-accent: var(--flexoki-yellow-600)
 }
 
 /* ============================================================
@@ -183,7 +184,8 @@ textarea { overflow:auto }
     --color-highlight: var(--flexoki-yellow-900);
     --color-action: var(--flexoki-green-400);
     --color-bg-hover: var(--flexoki-green-950);
-    --color-selection: rgba(135,154,57,0.2)
+    --color-selection: rgba(135,154,57,0.2);
+    --color-heading-accent: var(--flexoki-yellow-400)
   }
 }
 
@@ -254,8 +256,10 @@ h1, h2, h3, h4, h5, h6 {
   position:relative
 }
 h1 { font-weight:500; font-size:calc(1.6em + 0.45vw); letter-spacing:-0.025em; line-height:1.2; margin-top:1.5em; margin-bottom:0.25em }
-h2 { font-weight:var(--heading-weight); font-size:1.45em; letter-spacing:-0.015em; margin-top:1.5em; margin-bottom:0.5em; line-height:1.3 }
+h2 { font-weight:var(--heading-weight); font-size:1.45em; letter-spacing:-0.015em; margin-top:1.5em; margin-bottom:0.5em; line-height:1.3; color:var(--color-heading-accent) }
+h2::before { content:'## '; opacity:0.6 }
 h3 { font-weight:var(--heading-weight); font-size:1.15em; letter-spacing:-0.01em; line-height:1.3; margin-top:1.25em; margin-bottom:0.4em }
+h3::before { content:'### '; color:var(--color-heading-accent); opacity:0.6; font-weight:400 }
 h4 { font-size:1em; font-weight:600; line-height:1.3; margin-top:1em; margin-bottom:0.25em }
 h5 { font-weight:600; font-size:0.875em; font-variant-caps:small-caps; letter-spacing:0.02em; margin-bottom:0.75em; margin-top:1em }
 h6 { font-weight:400; font-size:0.875em; color:var(--color-tx-muted); margin-top:1em; margin-bottom:0.25em }
