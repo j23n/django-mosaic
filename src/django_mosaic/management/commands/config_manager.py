@@ -286,9 +286,10 @@ class ConfigManager:
         Returns:
             dict: Complete configuration
         """
-        # Start with saved config
+        # Start with saved config (copy so CLI overrides don't mutate the
+        # loaded dict, which would defeat the "changed?" check below).
         og_config = self.load_from_file()
-        config = og_config
+        config = og_config.copy()
 
         # Override with CLI args
         if cli_args:

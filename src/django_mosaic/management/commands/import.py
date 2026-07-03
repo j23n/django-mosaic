@@ -1,15 +1,31 @@
 from pathlib import Path
-import yaml
-import dateutil
 import logging
 
-from django.core.management.base import BaseCommand
-from django.utils.text import slugify
-from django_mosaic.models import Post, Tag, Namespace
+import yaml
+from dateutil import parser as date_parser
+
+from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
+from django_mosaic.models import Author, Post, Tag, Namespace
 
 EXPECTED_KEYWORDS = ["title", "date", "draft"]
 
 logger = logging.getLogger(__name__)
+
+
+def _as_tag_list(value):
+    """Normalize a YAML tag/category value into a list of strings.
+
+    Accepts a comma-separated string ("a, b") or a YAML list (["a", "b"]).
+    """
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [t.strip() for t in value.split(",") if t.strip()]
+    if isinstance(value, (list, tuple)):
+        return [str(t).strip() for t in value if str(t).strip()]
+    logger.warning(f"Could not process tags value {value!r}, unexpected type")
+    return []
 
 
 class Command(BaseCommand):
@@ -18,58 +34,78 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("path", type=Path)
         parser.add_argument("category", type=str)
+        parser.add_argument(
+            "--author",
+            type=str,
+            default=None,
+            help="Username of the author to attribute imported posts to. "
+            "Defaults to the only Author if exactly one exists.",
+        )
+
+    def _resolve_author(self, username):
+        if username:
+            try:
+                return Author.objects.get(user__username=username)
+            except Author.DoesNotExist:
+                raise CommandError(f"No Author found for user '{username}'.")
+        authors = list(Author.objects.all()[:2])
+        if len(authors) == 1:
+            return authors[0]
+        if not authors:
+            raise CommandError("No Author exists. Create one before importing posts.")
+        raise CommandError(
+            "Multiple Authors exist; specify one with --author <username>."
+        )
 
     def handle(self, *args, **options):
-        ns = Namespace.objects.get(name=options["category"])
+        try:
+            ns = Namespace.objects.get(name=options["category"])
+        except Namespace.DoesNotExist:
+            raise CommandError(f"Namespace '{options['category']}' does not exist.")
+
+        author = self._resolve_author(options["author"])
 
         for file in options["path"].glob("**/*.md"):
             logger.info(f"Importing {file}")
-            with open(file, "r") as f:
-                try:
+            try:
+                with open(file, "r") as f:
                     file_content = f.read()
-                    _, header, content = file_content.split("---", maxsplit=2)
+                _, header_raw, content = file_content.split("---", maxsplit=2)
+                header = yaml.safe_load(header_raw) or {}
 
-                    header = yaml.load(header, Loader=yaml.BaseLoader)
-
-                    if not all(ek in header.keys() for ek in EXPECTED_KEYWORDS):
-                        raise ValueError(
-                            f"Could not find all expected keywords in post metadata. Expected {EXPECTED_KEYWORDS}, found {header.keys()}"
-                        )
-
-                    slug = header.get("slug", slugify(header["title"]))
-
-                    tags = []
-                    header_tags = [
-                        t.strip() for t in header.get("tags", "").split(",") if t
-                    ]
-                    header_categories = [
-                        c.strip() for c in header.get("categories", "").split(",") if c
-                    ]
-                    header_tags.extend(header_categories)
-
-                    if header_tags:
-                        for t in header_tags:
-                            if not isinstance(t, str):
-                                logger.warning(
-                                    f"Could not process tag {t}, not a string"
-                                )
-                                continue
-
-                            t, _ = Tag.objects.get_or_create(name=t, namespace=ns)
-                            tags.append(t)
-
-                    post = Post(
-                        title=header["title"],
-                        is_published=not header["draft"],
-                        published_at=dateutil.parser.parse(header["date"]),
-                        slug=slug,
-                        namespace=ns,
-                        summary=header.get("description", ""),
-                        content=content,
+                missing = [ek for ek in EXPECTED_KEYWORDS if ek not in header]
+                if missing:
+                    raise ValueError(
+                        f"Missing expected metadata keys {missing}; "
+                        f"found {list(header.keys())}"
                     )
-                    post.save()
-                    for t in tags:
-                        post.tags.add(t)
-                    logger.info(f"Created post {post} with tags {tags}")
-                except (ValueError, OSError, Tag.DoesNotExist) as e:
-                    logger.error(f"Could not import {file}: {e}", exc_info=True)
+
+                slug = header.get("slug", "")
+
+                tag_names = _as_tag_list(header.get("tags"))
+                tag_names += _as_tag_list(header.get("categories"))
+                tags = [
+                    Tag.objects.get_or_create(name=name, namespace=ns)[0]
+                    for name in tag_names
+                ]
+
+                published_at = date_parser.parse(str(header["date"]))
+                if timezone.is_naive(published_at):
+                    published_at = timezone.make_aware(published_at)
+
+                post = Post(
+                    author=author,
+                    title=header["title"],
+                    is_published=not header["draft"],
+                    published_at=published_at,
+                    slug=slug,
+                    namespace=ns,
+                    summary=header.get("description", ""),
+                    content=content,
+                )
+                post.save()
+                if tags:
+                    post.tags.add(*tags)
+                logger.info(f"Created post {post} with tags {tags}")
+            except (ValueError, OSError, yaml.YAMLError) as e:
+                logger.error(f"Could not import {file}: {e}", exc_info=True)

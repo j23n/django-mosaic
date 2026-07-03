@@ -21,6 +21,8 @@ Design decisions:
 from django.core.management.utils import get_random_secret_key
 from django.conf import settings as django_settings
 from fabric import Connection
+import re
+import shlex
 import subprocess
 import tempfile
 import os
@@ -50,6 +52,19 @@ SERVICE_RESTART_DELAY = 10
 # Health check timeout in seconds
 HEALTH_CHECK_TIMEOUT = 5
 
+# Strict patterns for config values that are interpolated into remote shell
+# commands and rendered config files. These reject shell metacharacters,
+# whitespace, and newlines, closing command/template injection regardless of
+# whether a value came from a prompt, a CLI flag, or .deployment-config.toml.
+SHELL_SAFE_PATTERNS = {
+    "host": re.compile(r"^[A-Za-z0-9._-]{1,253}$"),
+    "user": re.compile(r"^[a-z_][a-z0-9_-]{0,31}$"),
+    "domain": re.compile(r"^(?=.{1,253}$)([A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,63}$"),
+    "email": re.compile(r"^[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,63}$"),
+    "app_name": re.compile(r"^[A-Za-z0-9._-]{1,64}$"),
+    "install_path": re.compile(r"^/[A-Za-z0-9._/-]{1,255}$"),
+}
+
 
 class DeploymentHandler:
     """Handles deployment operations for mosaic blog"""
@@ -78,6 +93,23 @@ class DeploymentHandler:
         template_path = self.get_template_dir() / filename
         with open(template_path, "r") as f:
             return f.read()
+
+    def validate_config(self, config):
+        """Reject config values that are unsafe to interpolate into shell/templates.
+
+        Runs against the merged config (file + CLI + prompts) so no source can
+        smuggle shell metacharacters into a remote root command. Raises
+        ValueError on the first offending field.
+        """
+        for field, pattern in SHELL_SAFE_PATTERNS.items():
+            value = config.get(field)
+            if value is None:
+                continue
+            if not pattern.match(str(value)):
+                raise ValueError(
+                    f"Refusing to proceed: config value for '{field}' "
+                    f"({value!r}) contains disallowed characters."
+                )
 
     def render_template(self, template_content, config):
         """Replace placeholders in template with config values"""
@@ -131,6 +163,16 @@ class DeploymentHandler:
 
         return conn.sudo(cmd, **kwargs)
 
+    # Env keys whose values must never be echoed to the terminal / CI logs.
+    _SECRET_ENV_KEYS = ("SECRET_KEY", "PASSWORD", "TOKEN", "API_KEY")
+
+    def _redact_secrets(self, line):
+        """Mask values of sensitive KEY=value assignments when displaying files."""
+        m = re.match(r"^\s*([A-Za-z0-9_]+)\s*=", line)
+        if m and any(k in m.group(1).upper() for k in self._SECRET_ENV_KEYS):
+            return f"{m.group(1)}=******** (redacted)"
+        return line
+
     def _put(self, conn, local_path, remote_path, description=None):
         """Upload file with content display and confirmation"""
         if description and self.explain_mode:
@@ -150,7 +192,7 @@ class DeploymentHandler:
                 self.stdout.write(self.style.SUCCESS("\n  Content:"))
                 self.stdout.write("  " + "-" * 70)
                 for i, line in enumerate(content.split("\n"), 1):
-                    self.stdout.write(f"  {i:3d} | {line}")
+                    self.stdout.write(f"  {i:3d} | {self._redact_secrets(line)}")
                 self.stdout.write("  " + "-" * 70)
             except (UnicodeDecodeError, IsADirectoryError):
                 # Binary file
@@ -210,6 +252,7 @@ class DeploymentHandler:
         try:
             # Step 1: Gather configuration
             config = config_manager.get_config(stdout=None)
+            self.validate_config(config)
 
             # Store config as instance variable for use in helper methods
             # This avoids passing config to every method and provides single source of truth
@@ -227,7 +270,9 @@ class DeploymentHandler:
                 return
 
             # Step 3: Install system dependencies
-            self.stdout.write(self.style.SUCCESS("\n📦 Installing system dependencies..."))
+            self.stdout.write(
+                self.style.SUCCESS("\n📦 Installing system dependencies...")
+            )
             try:
                 self.install_system_dependencies(conn)
             except Exception as e:
@@ -251,7 +296,9 @@ class DeploymentHandler:
                 return
 
             # Step 6: Build Docker image on VPS
-            self.stdout.write(self.style.SUCCESS("\n🐳 Building Docker image on VPS..."))
+            self.stdout.write(
+                self.style.SUCCESS("\n🐳 Building Docker image on VPS...")
+            )
             try:
                 self.build_docker_image_remote(conn)
             except Exception as e:
@@ -336,6 +383,7 @@ class DeploymentHandler:
         try:
             # Load config from file (no interactive prompts for fields already saved)
             config = config_manager.get_config(stdout=None)
+            self.validate_config(config)
             self.config = config
 
             # Generate secret key (needed for template rendering)
@@ -358,7 +406,9 @@ class DeploymentHandler:
                 return
 
             # Build Docker image
-            self.stdout.write(self.style.SUCCESS("\n🐳 Building Docker image on VPS..."))
+            self.stdout.write(
+                self.style.SUCCESS("\n🐳 Building Docker image on VPS...")
+            )
             try:
                 self.build_docker_image_remote(conn)
             except Exception as e:
@@ -770,8 +820,8 @@ class DeploymentHandler:
             f"certbot --nginx "
             f"--non-interactive "
             f"--agree-tos "
-            f"--email {email} "
-            f"-d {domain} "
+            f"--email {shlex.quote(email)} "
+            f"-d {shlex.quote(domain)} "
             f"--keep-until-expiring "  # Only obtain new cert if current one is expiring
             f"--expand"  # Allow expanding certificate with additional domains
         )
@@ -784,7 +834,9 @@ class DeploymentHandler:
                 self.stdout.write(self.style.SUCCESS("  ✓ SSL certificate obtained"))
             else:
                 self.stdout.write(
-                    self.style.WARNING("  ⚠ SSL setup failed (you may need to configure DNS first)")
+                    self.style.WARNING(
+                        "  ⚠ SSL setup failed (you may need to configure DNS first)"
+                    )
                 )
 
     def start_services(self, conn):
@@ -845,9 +897,8 @@ class DeploymentHandler:
             "app_name",
             "domain",
         ]
-        config = config_manager.get_config(
-            required_fields=required_fields, stdout=None
-        )
+        config = config_manager.get_config(required_fields=required_fields, stdout=None)
+        self.validate_config(config)
 
         # Store config as instance variable for use in helper methods
         self.config = config
@@ -910,7 +961,9 @@ class DeploymentHandler:
         ]
 
         for file_path, description in files_to_check:
-            result = self._run(conn, f"test -e {file_path}", quiet=True, warn=True, hide=True)
+            result = self._run(
+                conn, f"test -e {file_path}", quiet=True, warn=True, hide=True
+            )
             if result.ok:
                 # Check if backup.sh is executable
                 if "backup.sh" in file_path:
@@ -918,9 +971,15 @@ class DeploymentHandler:
                         conn, f"test -x {file_path}", quiet=True, warn=True, hide=True
                     )
                     if exec_result.ok:
-                        self.stdout.write(self.style.SUCCESS(f"  ✓ {description} exists (executable)"))
+                        self.stdout.write(
+                            self.style.SUCCESS(f"  ✓ {description} exists (executable)")
+                        )
                     else:
-                        self.stdout.write(self.style.WARNING(f"  ⚠ {description} exists (not executable)"))
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"  ⚠ {description} exists (not executable)"
+                            )
+                        )
                 else:
                     self.stdout.write(self.style.SUCCESS(f"  ✓ {description} exists"))
             else:
@@ -997,9 +1056,13 @@ class DeploymentHandler:
                 )
 
                 # Check if running container uses an outdated image
-                if container_image_id and not container_image_id.endswith(latest_image_id):
+                if container_image_id and not container_image_id.endswith(
+                    latest_image_id
+                ):
                     self.stdout.write(
-                        self.style.WARNING("  ⚠ Container is running an outdated image (restart needed)")
+                        self.style.WARNING(
+                            "  ⚠ Container is running an outdated image (restart needed)"
+                        )
                     )
         else:
             self.stdout.write(
@@ -1012,7 +1075,11 @@ class DeploymentHandler:
 
         # Check app service (should be continuously running)
         result = self._run(
-            conn, f"systemctl is-active {app_name}-app.service", quiet=True, warn=True, hide=True
+            conn,
+            f"systemctl is-active {app_name}-app.service",
+            quiet=True,
+            warn=True,
+            hide=True,
         )
         if result.ok and "active" in result.stdout:
             self.stdout.write(self.style.SUCCESS(f"  ✓ {app_name}-app.service active"))
@@ -1021,7 +1088,11 @@ class DeploymentHandler:
 
         # Check backup timer (should be active)
         result = self._run(
-            conn, f"systemctl is-active {app_name}-backup.timer", quiet=True, warn=True, hide=True
+            conn,
+            f"systemctl is-active {app_name}-backup.timer",
+            quiet=True,
+            warn=True,
+            hide=True,
         )
         if result.ok and "active" in result.stdout:
             self.stdout.write(self.style.SUCCESS(f"  ✓ {app_name}-backup.timer active"))
@@ -1040,7 +1111,9 @@ class DeploymentHandler:
             status = result.stdout.strip()
             if status == "success":
                 self.stdout.write(
-                    self.style.SUCCESS(f"  ✓ {app_name}-backup.service (last run) success")
+                    self.style.SUCCESS(
+                        f"  ✓ {app_name}-backup.service (last run) success"
+                    )
                 )
             elif status == "exit-code":
                 self.stdout.write(
@@ -1048,12 +1121,16 @@ class DeploymentHandler:
                 )
             else:
                 self.stdout.write(
-                    self.style.WARNING(f"  ⚠ {app_name}-backup.service (last run) {status}")
+                    self.style.WARNING(
+                        f"  ⚠ {app_name}-backup.service (last run) {status}"
+                    )
                 )
 
     def check_nginx_status(self, conn):
         """Check nginx status"""
-        result = self._run(conn, "systemctl is-active nginx", quiet=True, warn=True, hide=True)
+        result = self._run(
+            conn, "systemctl is-active nginx", quiet=True, warn=True, hide=True
+        )
         if result.ok and "active" in result.stdout:
             self.stdout.write(self.style.SUCCESS("  ✓ Nginx active"))
         else:

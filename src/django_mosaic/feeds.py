@@ -19,7 +19,9 @@ class PostFeed(Feed):
         return Namespace.objects.get(name=namespace)
 
     def items(self, obj):
-        return Post.objects.filter(namespace=obj, is_published=True)
+        return Post.objects.filter(namespace=obj, is_published=True).select_related(
+            "namespace"
+        )[:20]
 
     def item_title(self, item):
         return item.title

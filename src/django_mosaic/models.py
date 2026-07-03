@@ -1,19 +1,20 @@
-import bleach
+import html
 import markdown
 import reversion
 from reversion.models import Version
 import secrets
 from PIL import Image, ImageOps
 from io import BytesIO
-import os
 import logging
 
 import django.utils.timezone
+from django.conf import settings
+from django.utils.functional import cached_property
 from django.utils.text import slugify
+from django.utils.html import strip_tags
 from django.urls import reverse
 from django.db import models
 from django.utils.html import format_html
-from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 
 logger = logging.getLogger("django_mosaic")
@@ -34,7 +35,7 @@ class Namespace(models.Model):
 
 
 class Author(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     h_card = models.JSONField(default=dict, blank=True)
     display_name = models.CharField(max_length=256, blank=True, default="")
     url = models.URLField(max_length=512, blank=True, default="")
@@ -79,15 +80,29 @@ class ContentImage(models.Model):
     def __repr__(self):
         return f"<Image {self.image} [{self.alt[:50]}]>"
 
+    def _image_changed(self):
+        """True if the image field differs from the persisted row."""
+        if not self.pk:
+            return True
+        try:
+            old = ContentImage.objects.get(pk=self.pk)
+        except ContentImage.DoesNotExist:
+            return True
+        return old.image.name != self.image.name
+
     def save(self, *args, **kwargs):
-        # Only process image on creation
-        if not self.pk and self.image:
+        # Process the image on creation or whenever a new file is uploaded.
+        if self.image and self._image_changed():
             try:
                 random_name = secrets.token_hex(32)
 
                 img = Image.open(self.image.file)
                 # Fix orientation based on EXIF data
                 img = ImageOps.exif_transpose(img)
+
+                # JPEG cannot encode alpha/palette modes; normalize first.
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
 
                 # Resize main image to max 2048px on longest side (never upscales)
                 img.thumbnail((2048, 2048), Image.Resampling.LANCZOS)
@@ -97,9 +112,7 @@ class ContentImage(models.Model):
                 img.save(main_io, format="JPEG", quality=90, optimize=True)
                 main_io.seek(0)
                 new_filename = f"{random_name}.jpg"
-                self.image.save(
-                    new_filename, ContentFile(main_io.read()), save=False
-                )
+                self.image.save(new_filename, ContentFile(main_io.read()), save=False)
 
                 # Generate thumbnail (never upscales)
                 img.thumbnail((600, 600), Image.Resampling.LANCZOS)
@@ -110,7 +123,7 @@ class ContentImage(models.Model):
                 self.thumb.save(
                     thumb_filename, ContentFile(thumb_io.read()), save=False
                 )
-            except (OSError, ValueError) as e:
+            except (OSError, ValueError, Image.DecompressionBombError) as e:
                 logger.warning(f"Failed to process image: {e}")
 
         super().save(*args, **kwargs)
@@ -155,7 +168,7 @@ class Post(models.Model):
     tags = models.ManyToManyField("Tag", blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True, blank=False, null=False)
-    published_at = models.DateTimeField(blank=True, null=True)
+    published_at = models.DateTimeField(blank=True, null=True, db_index=True)
     changed_at = models.DateTimeField(auto_now=True, blank=False, null=False)
 
     secret_id = models.CharField(
@@ -166,13 +179,22 @@ class Post(models.Model):
         default=generate_secret_id,
     )
 
+    def clean(self):
+        super().clean()
+        # Keep the instance consistent with the published_post_has_published_at
+        # constraint, which is validated during full_clean() (e.g. admin forms)
+        # before save() would otherwise stamp this.
+        if self.is_published and not self.published_at:
+            self.published_at = django.utils.timezone.now()
+
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
         extra = set()
 
-        # no longer update the slug once it's been published
-        if not self.is_published and not self.slug:
-            base = slugify(self.title)[:246]
+        # Ensure every post has a slug. Once set (e.g. after first publish)
+        # it is never regenerated, so permalinks stay stable.
+        if not self.slug:
+            base = slugify(self.title)[:246] or secrets.token_hex(4)
             slug = base
             n = 2
             while Post.objects.filter(slug=slug).exclude(pk=self.pk).exists():
@@ -181,9 +203,10 @@ class Post(models.Model):
             self.slug = slug
             extra.add("slug")
         if not self.summary:
-            self.summary = bleach.clean(
-                markdown.markdown(self.content), strip=True, tags={}
-            )[:200]
+            # Render markdown, strip to plain text, and unescape entities so
+            # the meta-description summary isn't double-escaped by the template.
+            plain = html.unescape(strip_tags(markdown.markdown(self.content)))
+            self.summary = plain[:200].strip()
             extra.add("summary")
         if self.is_published and not self.published_at:
             self.published_at = django.utils.timezone.now()
@@ -194,15 +217,23 @@ class Post(models.Model):
 
         return super().save(*args, **kwargs)
 
-    @property
+    @cached_property
     def featured_image(self):
-        return self.contentimage_set.filter(is_featured=True).first() or self.contentimage_set.first()
+        images = list(self.contentimage_set.all())
+        for image in images:
+            if image.is_featured:
+                return image
+        return images[0] if images else None
 
     @property
     def published_content(self):
         if self.published_version_id is not None:
             try:
-                version = Version.objects.get(pk=self.published_version_id)
+                # Scope to this post's own versions so a corrupted pointer
+                # can't surface another object's content.
+                version = Version.objects.get_for_object(self).get(
+                    pk=self.published_version_id
+                )
                 return version.field_dict.get("content", self.content)
             except Version.DoesNotExist:
                 pass
@@ -225,7 +256,14 @@ class Post(models.Model):
         return f"<Post {self.title} - {date.year} [{self.namespace.name}]>"
 
     class Meta:
-        ordering = ["-published_at"]
+        ordering = ["-published_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(is_published=False)
+                | models.Q(published_at__isnull=False),
+                name="published_post_has_published_at",
+            )
+        ]
 
 
 class Tag(models.Model):
@@ -237,7 +275,17 @@ class Tag(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name)[:256]
+            base = slugify(self.name)[:250] or secrets.token_hex(4)
+            slug = base
+            n = 2
+            while (
+                Tag.objects.filter(slug=slug, namespace=self.namespace)
+                .exclude(pk=self.pk)
+                .exists()
+            ):
+                slug = f"{base}-{n}"
+                n += 1
+            self.slug = slug
         super().save(*args, **kwargs)
 
     def get_absolute_url(self):
@@ -250,4 +298,11 @@ class Tag(models.Model):
         return f"<Tag {self.name} [{self.namespace.name}]>"
 
     class Meta:
-        unique_together = ("name", "namespace")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "namespace"], name="unique_tag_name_per_namespace"
+            ),
+            models.UniqueConstraint(
+                fields=["slug", "namespace"], name="unique_tag_slug_per_namespace"
+            ),
+        ]

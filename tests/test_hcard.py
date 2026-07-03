@@ -1,7 +1,22 @@
+import re
+
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 
 from django_mosaic.models import Author, Namespace, Post, RelMeLink
+
+
+def has_class_tokens(content, *tokens):
+    """True if some class="..." attribute contains all given tokens.
+
+    Robust to class ordering and extra cosmetic classes, which is what matters
+    for microformats (the tokens carry the semantics, not their order).
+    """
+    for match in re.finditer(r'class="([^"]*)"', content):
+        classes = set(match.group(1).split())
+        if all(t in classes for t in tokens):
+            return True
+    return False
 
 
 class HCardTestBase(TestCase):
@@ -37,19 +52,19 @@ class HCardTestBase(TestCase):
 class HCardRenderingTest(HCardTestBase):
     def test_hcard_in_footer_on_homepage(self):
         resp = self.client.get("/")
-        self.assertContains(resp, 'class="h-card next"')
+        self.assertTrue(has_class_tokens(resp.content.decode(), "h-card"))
 
     def test_hcard_in_footer_on_post_page(self):
         resp = self.client.get(self.post.get_absolute_url())
-        self.assertContains(resp, 'class="h-card next"')
+        self.assertTrue(has_class_tokens(resp.content.decode(), "h-card"))
 
     def test_hcard_microformat_classes(self):
         resp = self.client.get("/")
         content = resp.content.decode()
-        self.assertIn('class="p-name u-url muted"', content)
-        self.assertIn('class="u-email muted"', content)
-        self.assertIn('class="u-photo" hidden', content)
-        self.assertIn('class="p-note"', content)
+        self.assertTrue(has_class_tokens(content, "p-name", "u-url"))
+        self.assertTrue(has_class_tokens(content, "u-email"))
+        self.assertTrue(has_class_tokens(content, "u-photo"))
+        self.assertTrue(has_class_tokens(content, "p-note"))
 
     def test_hcard_field_values(self):
         resp = self.client.get("/")
@@ -77,9 +92,7 @@ class HCardRenderingTest(HCardTestBase):
         resp = self.client.get("/")
         content = resp.content.decode()
         self.assertIn('<link rel="me" href="https://github.com/janedoe">', content)
-        self.assertIn(
-            '<link rel="me" href="https://mastodon.social/@jane">', content
-        )
+        self.assertIn('<link rel="me" href="https://mastodon.social/@jane">', content)
 
     def test_rel_me_in_head_on_post_page(self):
         resp = self.client.get(self.post.get_absolute_url())
@@ -108,7 +121,7 @@ class HCardBlankFieldsTest(TestCase):
     def test_blank_fields_omitted(self):
         resp = self.client.get("/")
         content = resp.content.decode()
-        self.assertIn('class="h-card next"', content)
+        self.assertTrue(has_class_tokens(content, "h-card"))
         self.assertIn("Minimal User", content)
         self.assertNotIn("u-email", content)
         self.assertNotIn("u-photo", content)

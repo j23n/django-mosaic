@@ -13,7 +13,14 @@ from django_mosaic.models import Post, Tag, ContentImage, Author, RelMeLink
 class ContentImageInlineAdmin(admin.TabularInline):
     model = ContentImage
     readonly_fields = ["thumb", "thumbnail_preview", "copy_markdown_button"]
-    fields = ["image", "thumbnail_preview", "caption", "alt", "is_featured", "copy_markdown_button"]
+    fields = [
+        "image",
+        "thumbnail_preview",
+        "caption",
+        "alt",
+        "is_featured",
+        "copy_markdown_button",
+    ]
 
     formfield_overrides = {
         models.CharField: {
@@ -69,7 +76,9 @@ class PostAdminForm(forms.ModelForm):
             versions = Version.objects.get_for_object(self.instance)
             for v in versions:
                 snippet = v.field_dict.get("content", "")[:60]
-                label = f"#{v.pk} — {v.revision.date_created:%Y-%m-%d %H:%M} — {snippet}"
+                label = (
+                    f"#{v.pk} — {v.revision.date_created:%Y-%m-%d %H:%M} — {snippet}"
+                )
                 choices.append((str(v.pk), label))
         self.fields["published_version"].choices = choices
         if self.instance and self.instance.published_version_id is not None:
@@ -105,6 +114,14 @@ class PostAdmin(VersionAdmin):
 
     change_form_template = "admin/django_mosaic/post/change_form.html"
 
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("namespace", "author__user")
+            .prefetch_related("tags")
+        )
+
     def get_tags(self, obj):
         return ", ".join([t.name for t in obj.tags.all()])
 
@@ -124,6 +141,9 @@ class PostAdmin(VersionAdmin):
 
     def save_model(self, request, obj, form, change):
         content_changed = not change or "content" in form.changed_data
+        # NOTE: do not wrap create_revision() in an outer transaction.atomic();
+        # django-reversion then defers the revision write to on_commit, which
+        # breaks revision creation inside rolled-back TestCase transactions.
         if content_changed:
             with reversion.create_revision():
                 obj.save()
@@ -134,8 +154,16 @@ class PostAdmin(VersionAdmin):
         if "_publish" in request.POST:
             latest = Version.objects.get_for_object(obj).first()
             if latest:
+                obj.is_published = True
                 obj.published_version_id = latest.pk
-                obj.save(update_fields=["published_version_id"])
+                # Let Post.save() stamp published_at on first publish.
+                obj.save()
+            else:
+                self.message_user(
+                    request,
+                    "Could not publish: no saved revision exists yet.",
+                    messages.WARNING,
+                )
         else:
             chosen = form.cleaned_data.get("published_version")
             obj.published_version_id = int(chosen) if chosen else None
@@ -170,8 +198,11 @@ class PostAdmin(VersionAdmin):
 
 
 class ContentImageAdmin(admin.ModelAdmin):
-    readonly_fields = ["image", "thumb"]
     list_display = ["alt", "caption", "post", "post__created_at"]
+
+    def get_readonly_fields(self, request, obj=None):
+        # Allow uploading on the add form; lock the processed files afterwards.
+        return ["thumb"] if obj is None else ["image", "thumb"]
 
 
 class TagAdmin(admin.ModelAdmin):

@@ -7,8 +7,7 @@ Usage:
     python manage.py mosaic deployment status
 """
 
-from django.core.management.base import BaseCommand
-from ._deployment import DeploymentHandler
+from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):
@@ -52,7 +51,8 @@ class Command(BaseCommand):
 
         # Deployment: setup
         setup = deployment_subparsers.add_parser(
-            "setup", help="Full deployment setup (system deps, firewall, nginx, SSL, app)"
+            "setup",
+            help="Full deployment setup (system deps, firewall, nginx, SSL, app)",
         )
         add_deploy_flags(setup)
 
@@ -75,6 +75,13 @@ class Command(BaseCommand):
         subcommand = options.get("subcommand")
 
         if command == "deployment":
+            try:
+                from ._deployment import DeploymentHandler
+            except ImportError as e:
+                raise CommandError(
+                    "Deployment tooling requires the optional 'deploy' extra. "
+                    "Install it with: pip install 'django-mosaic[deploy]'"
+                ) from e
             handler = DeploymentHandler(stdout=self.stdout, style=self.style)
 
             if subcommand == "setup":
@@ -85,9 +92,7 @@ class Command(BaseCommand):
                 handler.check_status(options)
             else:
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"Unknown deployment subcommand: {subcommand}"
-                    )
+                    self.style.ERROR(f"Unknown deployment subcommand: {subcommand}")
                 )
         else:
             self.stdout.write(self.style.ERROR(f"Unknown command: {command}"))

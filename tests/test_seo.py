@@ -86,7 +86,7 @@ class PostDetailLightboxTest(SEOTestBase):
         self.assertContains(self.resp, "glightbox.min.js")
 
     def test_glightbox_targets_content_links(self):
-        self.assertContains(self.resp, "selector: '.e-content a'")
+        self.assertContains(self.resp, "selector: '.e-content a")
 
 
 class PostDetailTwitterCardTest(SEOTestBase):

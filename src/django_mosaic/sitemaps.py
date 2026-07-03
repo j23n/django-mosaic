@@ -7,7 +7,12 @@ class PostSitemap(Sitemap):
     changefreq = "weekly"
 
     def items(self):
-        return Post.objects.filter(is_published=True, namespace__name="public")
+        # Every published post except those in the gated "private" namespace.
+        return (
+            Post.objects.filter(is_published=True)
+            .exclude(namespace__name="private")
+            .select_related("namespace")
+        )
 
     def lastmod(self, obj):
         return obj.changed_at

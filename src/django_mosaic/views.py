@@ -1,13 +1,18 @@
 from django.shortcuts import render, get_object_or_404
 from reversion.models import Version
-from django_mosaic.models import Post, Tag, ContentImage
+from django_mosaic.models import Namespace, Post, Tag, ContentImage
 
 
 def _get_posts(namespace="public"):
-    return Post.objects.filter(namespace__name=namespace, is_published=True)
+    return (
+        Post.objects.filter(namespace__name=namespace, is_published=True)
+        .select_related("namespace", "author__user")
+        .prefetch_related("tags")
+    )
 
 
 def home(request, namespace="public"):
+    get_object_or_404(Namespace, name=namespace)
     posts = _get_posts(namespace)
     tags = Tag.objects.filter(post__in=posts).distinct().order_by("name")
 
@@ -20,14 +25,16 @@ def home(request, namespace="public"):
 
 def post_list(request, namespace):
     posts = _get_posts(namespace)
-    return render(
-        request, "post-list.html", {"posts": posts, "namespace": namespace}
-    )
+    return render(request, "post-list.html", {"posts": posts, "namespace": namespace})
 
 
 def post_detail(request, namespace, year, post_slug):
     post = get_object_or_404(
-        Post, slug=post_slug, namespace__name=namespace, is_published=True
+        Post.objects.select_related("namespace", "author__user"),
+        slug=post_slug,
+        namespace__name=namespace,
+        is_published=True,
+        published_at__year=year,
     )
     post.content = post.published_content
 
@@ -59,7 +66,7 @@ def post_detail(request, namespace, year, post_slug):
 
 
 def draft_detail(request, namespace, secret_id):
-    post = get_object_or_404(Post, secret_id=secret_id)
+    post = get_object_or_404(Post, secret_id=secret_id, namespace__name=namespace)
 
     versions = Version.objects.get_for_object(post)
     if versions.exists():

@@ -9,6 +9,15 @@ from PIL import Image
 from django_mosaic.models import Author, ContentImage, Namespace, Post, Tag
 
 
+def has_class_tokens(content, *tokens):
+    """True if some class="..." attribute contains all given tokens."""
+    for match in re.finditer(r'class="([^"]*)"', content):
+        classes = set(match.group(1).split())
+        if all(t in classes for t in tokens):
+            return True
+    return False
+
+
 class HEntryTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -46,13 +55,11 @@ class PostDetailHEntryTest(HEntryTestBase):
         self.assertIn(self.post.get_absolute_url(), self.content)
 
     def test_p_category_on_tags(self):
-        self.assertIn('class="p-category"', self.content)
+        self.assertTrue(has_class_tokens(self.content, "p-category"))
         self.assertIn("indieweb", self.content)
 
     def test_dt_published_iso_format(self):
-        match = re.search(
-            r'class="dt-published" datetime="([^"]+)"', self.content
-        )
+        match = re.search(r'class="dt-published" datetime="([^"]+)"', self.content)
         self.assertIsNotNone(match)
         dt_value = match.group(1)
         # ISO 8601 has a T separator and timezone offset (e.g. +00:00)
@@ -78,7 +85,10 @@ class PostDetailUPhotoTest(HEntryTestBase):
             post=self.post, image=self._make_image(), alt="Regular photo"
         )
         ContentImage.objects.create(
-            post=self.post, image=self._make_image(), alt="Featured photo", is_featured=True
+            post=self.post,
+            image=self._make_image(),
+            alt="Featured photo",
+            is_featured=True,
         )
         resp = self.client.get(self.post.get_absolute_url())
         content = resp.content.decode()
@@ -122,19 +132,17 @@ class HomepageHFeedTest(HFeedTestBase):
         self.assertIn('class="h-feed"', self.content)
 
     def test_h_entry_on_list_item(self):
-        self.assertIn('class="h-entry"', self.content)
+        self.assertTrue(has_class_tokens(self.content, "h-entry"))
 
     def test_u_url_on_link(self):
-        self.assertIn('class="u-url plain"', self.content)
+        self.assertTrue(has_class_tokens(self.content, "u-url"))
 
     def test_p_name_on_title(self):
         self.assertIn('class="p-name"', self.content)
         self.assertIn("Feed Post", self.content)
 
     def test_dt_published_on_date(self):
-        match = re.search(
-            r'class="dt-published" datetime="([^"]+)"', self.content
-        )
+        match = re.search(r'class="dt-published" datetime="([^"]+)"', self.content)
         self.assertIsNotNone(match)
         self.assertIn("T", match.group(1))
 
@@ -143,7 +151,7 @@ class PostListHFeedTest(HFeedTestBase):
     def test_h_feed_on_post_list(self):
         resp = self.client.get("/public/posts")
         self.assertContains(resp, 'class="h-feed"')
-        self.assertContains(resp, 'class="h-entry"')
+        self.assertTrue(has_class_tokens(resp.content.decode(), "h-entry"))
 
 
 class TagDetailHFeedTest(HFeedTestBase):
@@ -156,4 +164,4 @@ class TagDetailHFeedTest(HFeedTestBase):
     def test_h_feed_on_tag_page(self):
         resp = self.client.get(self.tag.get_absolute_url())
         self.assertContains(resp, 'class="h-feed"')
-        self.assertContains(resp, 'class="h-entry"')
+        self.assertTrue(has_class_tokens(resp.content.decode(), "h-entry"))

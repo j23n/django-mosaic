@@ -13,14 +13,21 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# SECURITY WARNING: keep the secret key used in production secret!
-# In production, this is provided via environment variable
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY", "dev-insecure-change-this-in-production-1234567890abcdefghijklmnop"
-)
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "t", "yes")
+# Defaults closed: only an explicit DEBUG=True enables debug mode.
+DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t", "yes")
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# In production the key must come from the environment; there is no insecure
+# fallback. A throwaway key is only used to keep local DEBUG runs convenient.
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "dev-insecure-change-this-in-production-1234567890abcdefghijklmnop"
+    else:
+        raise RuntimeError(
+            "SECRET_KEY environment variable must be set when DEBUG is off."
+        )
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
@@ -58,6 +65,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Enforces access control on private (protected_path) namespaces.
+    # Without this, the /private/ tree is served with no authorization.
+    "django_magic_authorization.middleware.MagicAuthorizationMiddleware",
 ]
 
 ROOT_URLCONF = "urls"
@@ -154,9 +164,33 @@ MARKDOWNIFY = {
             "markdown.extensions.extra",
             "markdown.extensions.codehilite",
         ],
-        "BLEACH": False,
+        # Sanitize rendered HTML. Post content is rendered through markdownify
+        # on public pages and in RSS, so leaving this off is a stored-XSS hole.
+        "BLEACH": True,
+        "WHITELIST_TAGS": [
+            "a", "abbr", "acronym", "b", "blockquote", "br", "code", "del",
+            "div", "em", "figure", "figcaption", "h1", "h2", "h3", "h4", "h5",
+            "h6", "hr", "i", "img", "li", "ol", "p", "pre", "span", "strong",
+            "sub", "sup", "table", "tbody", "td", "th", "thead", "tr", "ul",
+        ],
+        "WHITELIST_ATTRS": ["href", "src", "alt", "title", "class"],
     }
 }
+
+
+# Security hardening (active when DEBUG is off).
+# nginx terminates TLS and forwards X-Forwarded-Proto, so Django must trust it
+# to build https:// absolute URLs (canonical tags, og:url, sitemap).
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 
 # Logging Configuration
