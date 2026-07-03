@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, render
 from reversion.models import Version
 
@@ -12,21 +14,36 @@ def _get_posts(namespace="public"):
     )
 
 
+def _paginate(request, queryset):
+    """Paginate a queryset. `posts` stays iterable (a Page), and `page_obj`
+    drives the pagination controls. Page size is MOSAIC_PAGE_SIZE (default 10).
+    """
+    per_page = getattr(settings, "MOSAIC_PAGE_SIZE", 10)
+    paginator = Paginator(queryset, per_page)
+    return paginator.get_page(request.GET.get("page"))
+
+
 def home(request, namespace="public"):
     get_object_or_404(Namespace, name=namespace)
-    posts = _get_posts(namespace)
-    tags = Tag.objects.filter(post__in=posts).distinct().order_by("name")
+    all_posts = _get_posts(namespace)
+    # Tags reflect the whole namespace, not just the current page.
+    tags = Tag.objects.filter(post__in=all_posts).distinct().order_by("name")
+    page = _paginate(request, all_posts)
 
     return render(
         request,
         [f"home-{namespace}.html", "home.html"],
-        {"posts": posts, "tags": tags, "namespace": namespace},
+        {"posts": page, "page_obj": page, "tags": tags, "namespace": namespace},
     )
 
 
 def post_list(request, namespace):
-    posts = _get_posts(namespace)
-    return render(request, "post-list.html", {"posts": posts, "namespace": namespace})
+    page = _paginate(request, _get_posts(namespace))
+    return render(
+        request,
+        "post-list.html",
+        {"posts": page, "page_obj": page, "namespace": namespace},
+    )
 
 
 def post_detail(request, namespace, year, post_slug):
@@ -85,13 +102,20 @@ def draft_detail(request, namespace, secret_id):
 def tag_detail(request, namespace, slug):
     tag = get_object_or_404(Tag, slug=slug, namespace__name=namespace)
 
-    posts = _get_posts(namespace).filter(tags=tag)
-    images = ContentImage.objects.filter(post__in=posts).select_related("post")
+    tagged = _get_posts(namespace).filter(tags=tag)
+    images = ContentImage.objects.filter(post__in=tagged).select_related("post")
+    page = _paginate(request, tagged)
 
     return render(
         request,
         [f"tags/{tag.slug}.html", "tag-detail.html"],
-        {"posts": posts, "tag": tag, "images": images, "namespace": namespace},
+        {
+            "posts": page,
+            "page_obj": page,
+            "tag": tag,
+            "images": images,
+            "namespace": namespace,
+        },
     )
 
 

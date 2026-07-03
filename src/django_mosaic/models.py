@@ -9,6 +9,8 @@ import reversion
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.functional import cached_property
 from django.utils.html import format_html, strip_tags
@@ -316,3 +318,16 @@ class Tag(models.Model):
                 fields=["slug", "namespace"], name="unique_tag_slug_per_namespace"
             ),
         ]
+
+
+@receiver(post_delete, sender=ContentImage)
+def _delete_contentimage_files(sender, instance, **kwargs):
+    """Remove the stored image/thumbnail files when a ContentImage row is
+    deleted (directly or via Post cascade), so media doesn't accumulate."""
+    for field in (instance.image, instance.thumb):
+        if not field:
+            continue
+        try:
+            field.delete(save=False)
+        except Exception as e:  # noqa: BLE001 - deletion is best-effort
+            logger.warning(f"Failed to delete image file {field.name}: {e}")
