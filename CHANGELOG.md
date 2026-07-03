@@ -7,21 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-03
+
 ### Added
 - Martor markdown editor in the admin with live preview and toolbar image
   upload; drag-and-drop multi-image upload zone on the post change form
   (uploads create processed `ContentImage` rows immediately).
 - Optional ATProto bridge (`django_mosaic.atproto`): published public posts
-  sync to your PDS as `site.standard.document` records with a companion
-  Bluesky post; well-known endpoints for domain-as-handle and publication
-  verification; `manage.py atproto publish|unpublish|status`.
+  sync to your PDS as `site.standard.document` records (with `coverImage` and
+  a mosaic-native markdown `content` block) plus a companion Bluesky post;
+  well-known endpoints for domain-as-handle and publication verification;
+  `manage.py atproto publish|unpublish|status|warm|check`. See
+  `docs/atproto-setup.md`.
 - ATmosphere reactions on post pages: Bluesky like/repost counts and reply
   thread as the comment section, plus cross-app reaction counts via the
-  Constellation backlink index.
+  Constellation backlink index. Bounded render-path latency
+  (`REACTIONS_TIMEOUT`) with an optional cache-only mode
+  (`REACTIONS_BLOCKING`) warmed by `manage.py atproto warm`.
 - Lexicon collection pages rendered straight from your PDS repo
   (`/projects` from `sh.tangled.repo`, `/books` from `buzz.bookhive.book`,
   any collection via `MOSAIC_ATPROTO["LEXICON_PAGES"]`), customizable by
   template override with a generic fallback renderer.
+- `mosaic-admin init` console-script scaffolder that generates a complete
+  runnable project.
+- List pagination (`MOSAIC_PAGE_SIZE`, default 10) on home/list/tag pages.
+- CI (GitHub Actions: ruff + black + tests across Python 3.12/3.13 × Django
+  5.2/6.0), lint/format config, `py.typed` markers, and unit tests for the
+  previously-untested deployment tooling.
 
 ### Fixed
 - Shipped settings template now installs `MagicAuthorizationMiddleware`
@@ -37,11 +49,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment tooling validates config values against shell injection and
   redacts secrets from terminal output; production settings default closed
   (DEBUG off, required SECRET_KEY, secure cookies/HSTS/proxy header).
+- Deleting a `ContentImage` (or its `Post`) now removes the stored image
+  files instead of orphaning them.
 
 ### Changed
+- `Post.published_version` is now a `ForeignKey` to `reversion.Version`
+  (`SET_NULL`) instead of a raw integer id; the migration preserves existing
+  pinned pointers.
 - `fabric` moved to the optional `deploy` extra
   (`pip install django-mosaic[deploy]`); `bleach` dependency dropped;
-  markdown sanitization enabled by default in generated settings.
+  `markdown`/`pyyaml`/`python-dateutil`/`requests` declared; Django capped
+  `<7`; markdown sanitization enabled by default in generated settings.
+
+### Migration notes
+- Upgrading from an existing install: run `python manage.py migrate`. The
+  `published_version` change is a state-only migration and preserves data.
+- The private namespace requires `MagicAuthorizationMiddleware` in
+  `MIDDLEWARE`; add it if you are not using the shipped settings template.
 
 ## [0.1.4] - 2026-02-07
 

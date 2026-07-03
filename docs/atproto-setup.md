@@ -299,10 +299,19 @@ Defaults are taken from `conf.py` (`DEFAULTS`) and the lexicon/reaction modules.
 | `AUTO_PUBLISH` | `True` | Sync a post to the PDS automatically on save when it is published and syncable. |
 | `COMPANION_POST` | `True` | Also create an `app.bsky.feed.post` (external embed of the canonical URL) when first publishing a document. |
 | `COMPANION_TEXT` | `"New post: {title}\n\n{url}"` | Template for the companion post text. `{title}` and `{url}` are substituted. Truncated to 300 graphemes. |
-| `TIMEOUT` | `15` | Timeout in seconds for every XRPC / HTTP call the bridge makes. |
+| `TIMEOUT` | `15` | Timeout (seconds) for publish/write XRPC calls (run from management commands). |
+| `REACTIONS_TIMEOUT` | `3` | Timeout (seconds) for reaction fetches on the public render path — kept short so a slow/down API can't hang a post page. |
+| `REACTIONS_BLOCKING` | `True` | When `False`, post pages use only cached reactions (never a live call); warm the cache out of band with `manage.py atproto warm`. Recommended for high-traffic sites. |
+| `CONTENT_NSID` | `"blog.mosaic.content.markdown"` | `$type` of the mosaic-native markdown block embedded in the document's open `content` union. Override with your own domain-based NSID if you publish a lexicon for it. |
+| `CONTENT_MAX_INLINE_BYTES` | `30000` | Skip the inline content block above this size to avoid 413s against the PDS record limit; `textContent` still carries the post. |
 | `LEXICON_PAGES` | `{"projects": {...sh.tangled.repo...}, "books": {...buzz.bookhive.book...}}` | Root-level pages rendering repo collections (`{slug: {collection, title}}`). Setting it replaces the defaults. |
 | `APPVIEW_URL` | `"https://public.api.bsky.app"` | Override the Bluesky AppView used for `getPostThread`. Rarely needed. |
 | `CONSTELLATION_URL` | `"https://constellation.microcosm.blue"` | Override the Constellation backlink index. Rarely needed (e.g. self-hosted). |
+
+The document `coverImage` is set from the post's featured thumbnail (uploaded
+once and reused for the companion post embed). A core mosaic setting,
+`MOSAIC_PAGE_SIZE` (default `10`), controls list pagination independent of the
+bridge.
 
 Fixed NSIDs used by the bridge (not configurable): documents are
 `site.standard.document`, the publication is `site.standard.publication`, and
