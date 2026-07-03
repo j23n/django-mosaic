@@ -15,11 +15,17 @@ from unittest.mock import Mock
 
 import pytest
 
-from django_mosaic.management.commands._deployment import (
+# Deployment tooling lives behind the optional `deploy` extra (fabric). Skip
+# the whole module cleanly when it isn't installed rather than error at import.
+pytest.importorskip("fabric")
+
+from django_mosaic.management.commands._deployment import (  # noqa: E402
     SHELL_SAFE_PATTERNS,
     DeploymentHandler,
 )
-from django_mosaic.management.commands.config_manager import ConfigManager
+from django_mosaic.management.commands.config_manager import (  # noqa: E402
+    ConfigManager,
+)
 
 
 def make_handler():
