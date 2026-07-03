@@ -89,6 +89,20 @@ class PublishedContentPropertyTest(RevisionTestBase):
         self.draft_post.published_version_id = 999999
         self.assertEqual(self.draft_post.published_content, self.draft_post.content)
 
+    def test_deleting_pinned_version_nulls_the_pointer(self):
+        # The FK's on_delete=SET_NULL must clear the pointer instead of
+        # leaving a dangling id when a pinned Version is deleted.
+        versions = Version.objects.get_for_object(self.draft_post)
+        original = versions.last()
+        self.draft_post.published_version_id = original.pk
+        self.draft_post.save(update_fields=["published_version"])
+
+        original.delete()
+
+        self.draft_post.refresh_from_db()
+        self.assertIsNone(self.draft_post.published_version_id)
+        self.assertEqual(self.draft_post.published_content, self.draft_post.content)
+
 
 class PublishedViewIsolationTest(RevisionTestBase):
     def test_published_view_shows_published_content(self):
@@ -96,7 +110,7 @@ class PublishedViewIsolationTest(RevisionTestBase):
         versions = Version.objects.get_for_object(self.draft_post)
         original = versions.last()
         self.draft_post.published_version_id = original.pk
-        self.draft_post.save(update_fields=["published_version_id"])
+        self.draft_post.save(update_fields=["published_version"])
 
         year = self.draft_post.published_at.year
         resp = self.client.get(f"/public/posts/{year}/{self.draft_post.slug}")
@@ -107,7 +121,7 @@ class PublishedViewIsolationTest(RevisionTestBase):
     def test_published_view_shows_current_content_when_no_version_pinned(self):
         # When no version is pinned, published_content falls back to self.content
         self.draft_post.published_version_id = None
-        self.draft_post.save(update_fields=["published_version_id"])
+        self.draft_post.save(update_fields=["published_version"])
 
         year = self.draft_post.published_at.year
         resp = self.client.get(f"/public/posts/{year}/{self.draft_post.slug}")
@@ -119,7 +133,7 @@ class PublishedViewIsolationTest(RevisionTestBase):
         versions = Version.objects.get_for_object(self.draft_post)
         original = versions.last()
         self.draft_post.published_version_id = original.pk
-        self.draft_post.save(update_fields=["published_version_id"])
+        self.draft_post.save(update_fields=["published_version"])
 
         resp = self.client.get(f"/public/posts/drafts/{self.draft_post.secret_id}")
         self.assertEqual(resp.status_code, 200)
@@ -168,7 +182,7 @@ class PublishRevisionTest(RevisionTestBase):
         latest = versions.first()
         post.published_version_id = latest.pk
         post.is_published = True
-        post.save(update_fields=["published_version_id", "is_published"])
+        post.save(update_fields=["published_version", "is_published"])
 
         post.refresh_from_db()
         self.assertEqual(post.published_version_id, latest.pk)
@@ -255,7 +269,7 @@ class FeedPublishedContentTest(RevisionTestBase):
         versions = Version.objects.get_for_object(self.draft_post)
         original = versions.last()
         self.draft_post.published_version_id = original.pk
-        self.draft_post.save(update_fields=["published_version_id"])
+        self.draft_post.save(update_fields=["published_version"])
 
         resp = self.client.get("/public/feed")
         self.assertEqual(resp.status_code, 200)

@@ -152,14 +152,23 @@ class ContentImage(models.Model):
         )
 
 
-@reversion.register(exclude=["published_version_id"])
+@reversion.register(exclude=["published_version"])
 class Post(models.Model):
     author = models.ForeignKey(Author, on_delete=models.PROTECT)
     title = models.CharField(max_length=512, blank=False, null=False)
     content = models.TextField()
     slug = models.SlugField(max_length=256, blank=True, null=False, unique=True)
     summary = models.CharField(max_length=1024, null=False, blank=True)
-    published_version_id = models.IntegerField(null=True, blank=True)
+    # Pinned revision shown on the public site. FK (not a raw id) so a deleted
+    # Version nulls the pointer instead of orphaning it; the raw-id accessor
+    # `published_version_id` still works everywhere it did before.
+    published_version = models.ForeignKey(
+        "reversion.Version",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
 
     namespace = models.ForeignKey(
         "Namespace", on_delete=models.PROTECT, blank=False, null=False

@@ -70,6 +70,9 @@ class PostAdminForm(forms.ModelForm):
 
     class Meta:
         model = Post
+        # published_version is intentionally omitted: the model field is a FK,
+        # but this form edits it through the declared `published_version`
+        # ChoiceField above (a plain revision picker), which save_model reads.
         fields = [
             "author",
             "title",
@@ -80,7 +83,6 @@ class PostAdminForm(forms.ModelForm):
             "is_published",
             "tags",
             "published_at",
-            "published_version",
         ]
 
     def __init__(self, *args, **kwargs):
@@ -103,7 +105,10 @@ class PostAdminForm(forms.ModelForm):
 
 class PostAdmin(VersionAdmin):
     form = PostAdminForm
-    exclude = ["published_version_id", "secret_id"]
+    # Exclude the model FK from the generated form: it's edited through the
+    # declared `published_version` ChoiceField (a revision picker), which
+    # save_model reads. The declared field survives this exclude.
+    exclude = ["published_version", "secret_id"]
     readonly_fields = ["created_at"]
     list_display = [
         "title",
@@ -187,7 +192,7 @@ class PostAdmin(VersionAdmin):
         else:
             chosen = form.cleaned_data.get("published_version")
             obj.published_version_id = int(chosen) if chosen else None
-            obj.save(update_fields=["published_version_id"])
+            obj.save(update_fields=["published_version"])
 
     @admin.action(description="Publish latest revision")
     def publish_revision(self, request, queryset):
@@ -201,7 +206,7 @@ class PostAdmin(VersionAdmin):
             latest = versions.first()
             post.published_version_id = latest.pk
             post.is_published = True
-            post.save(update_fields=["published_version_id", "is_published"])
+            post.save(update_fields=["published_version", "is_published"])
             published += 1
         if published:
             self.message_user(
