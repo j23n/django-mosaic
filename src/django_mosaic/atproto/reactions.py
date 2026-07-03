@@ -85,19 +85,26 @@ def _flatten_replies(node, depth=0, max_depth=6):
     return replies
 
 
-def fetch_thread(bsky_post_uri):
-    """Counts + flattened replies for the companion post; None on failure."""
+def fetch_thread(bsky_post_uri, blocking=True):
+    """Counts + flattened replies for the companion post; None on failure.
+
+    When blocking is False, only cached data is returned (a miss yields None)
+    so the render path never makes a live call.
+    """
     if not bsky_post_uri:
         return None
     cache_key = f"mosaic_atproto:thread:{bsky_post_uri}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
+    if not blocking:
+        return None
     try:
         data = xrpc_get(
             _appview_url(),
             "app.bsky.feed.getPostThread",
             {"uri": bsky_post_uri, "depth": 6},
+            timeout=conf.get_setting("REACTIONS_TIMEOUT"),
         )
         thread = data.get("thread") or {}
         post = thread.get("post") or {}
@@ -148,21 +155,24 @@ def _parse_constellation(data):
     return counts
 
 
-def fetch_crossapp_counts(targets):
+def fetch_crossapp_counts(targets, blocking=True):
     """Backlink counts for the given targets (AT-URIs and/or URLs), merged.
 
-    Returns a list of {"collection", "label", "count"} sorted by count.
+    Returns a list of {"collection", "label", "count"} sorted by count. When
+    blocking is False, only cached targets contribute (misses are skipped).
     """
     merged = {}
     for target in [t for t in targets if t]:
         cache_key = f"mosaic_atproto:constellation:{target}"
         counts = cache.get(cache_key)
         if counts is None:
+            if not blocking:
+                continue
             try:
                 resp = requests.get(
                     f"{_constellation_url()}/links/all",
                     params={"target": target},
-                    timeout=conf.get_setting("TIMEOUT"),
+                    timeout=conf.get_setting("REACTIONS_TIMEOUT"),
                 )
                 resp.raise_for_status()
                 counts = _parse_constellation(resp.json())
@@ -191,13 +201,21 @@ def fetch_crossapp_counts(targets):
     )
 
 
-def reactions_for(post):
-    """Everything the reactions template needs, for a synced post."""
+def reactions_for(post, blocking=None):
+    """Everything the reactions template needs, for a synced post.
+
+    On the render path, `blocking` defaults to REACTIONS_BLOCKING: when that is
+    False the page uses only cached data (populated by `manage.py atproto
+    warm`) and never makes a live call, bounding page latency to zero.
+    """
     document = getattr(post, "atproto_document", None)
     if document is None:
         return None
-    thread = fetch_thread(document.bsky_post_uri)
+    if blocking is None:
+        blocking = conf.get_setting("REACTIONS_BLOCKING")
+    thread = fetch_thread(document.bsky_post_uri, blocking=blocking)
     crossapp = fetch_crossapp_counts(
-        [document.uri, f"{conf.publication_url()}{post.get_absolute_url()}"]
+        [document.uri, f"{conf.publication_url()}{post.get_absolute_url()}"],
+        blocking=blocking,
     )
     return {"document": document, "thread": thread, "crossapp": crossapp}

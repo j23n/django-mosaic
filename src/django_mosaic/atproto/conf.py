@@ -44,8 +44,15 @@ DEFAULTS = {
     "AUTO_PUBLISH": True,
     "COMPANION_POST": True,
     "COMPANION_TEXT": "New post: {title}\n\n{url}",
-    # Timeout (seconds) for every XRPC HTTP call.
+    # Timeout (seconds) for publish/write XRPC calls (run from mgmt commands).
     "TIMEOUT": 15,
+    # Timeout (seconds) for reaction fetches on the public render path. Kept
+    # short so a slow/down PDS or index can't hang a post page for readers.
+    "REACTIONS_TIMEOUT": 3,
+    # When False, the render path only ever reads cached reactions (never
+    # makes a live call) and returns nothing on a miss. Warm the cache out of
+    # band with `manage.py atproto warm`. Recommended for high-traffic sites.
+    "REACTIONS_BLOCKING": True,
 }
 
 DOCUMENT_NSID = "site.standard.document"

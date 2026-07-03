@@ -146,12 +146,12 @@ class Session:
         return resp.json()["blob"]
 
 
-def xrpc_get(base_url, nsid, params=None):
+def xrpc_get(base_url, nsid, params=None, timeout=None):
     """Unauthenticated XRPC GET (public reads: listRecords, getPostThread...)."""
     resp = requests.get(
         f"{base_url.rstrip('/')}/xrpc/{nsid}",
         params=params or {},
-        timeout=conf.get_setting("TIMEOUT"),
+        timeout=timeout if timeout is not None else conf.get_setting("TIMEOUT"),
     )
     _raise_for_error(resp)
     return resp.json()

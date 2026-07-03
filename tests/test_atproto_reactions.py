@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import TestCase
 
-from django_mosaic.atproto import reactions
+from django_mosaic.atproto import conf, reactions
 from django_mosaic.atproto.models import DocumentRecord
 from django_mosaic.models import Author, Namespace, Post
 
@@ -116,6 +116,28 @@ class FetchThreadTest(ReactionsTestBase):
             reactions.fetch_thread(self.document.bsky_post_uri)
             reactions.fetch_thread(self.document.bsky_post_uri)
         fetch.assert_called_once()
+
+    def test_render_path_uses_short_timeout(self):
+        with mock.patch(
+            "django_mosaic.atproto.reactions.xrpc_get",
+            return_value=THREAD_RESPONSE,
+        ) as fetch:
+            reactions.fetch_thread(self.document.bsky_post_uri)
+        # The render-path fetch must pass the short REACTIONS_TIMEOUT, not the
+        # long publish TIMEOUT, so a slow AppView can't hang a post page.
+        self.assertEqual(
+            fetch.call_args.kwargs["timeout"], conf.get_setting("REACTIONS_TIMEOUT")
+        )
+
+    def test_non_blocking_returns_cache_only(self):
+        # No cache + non-blocking => no live call, returns None.
+        with mock.patch(
+            "django_mosaic.atproto.reactions.xrpc_get",
+            side_effect=AssertionError("must not call the network"),
+        ):
+            self.assertIsNone(
+                reactions.fetch_thread(self.document.bsky_post_uri, blocking=False)
+            )
 
 
 class ConstellationTest(ReactionsTestBase):
