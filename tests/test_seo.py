@@ -1,5 +1,5 @@
-from django.test import TestCase
 from django.contrib.auth.models import User
+from django.test import TestCase
 
 from django_mosaic.models import Author, ContentImage, Namespace, Post
 
@@ -115,8 +115,9 @@ class PostDetailTwitterCardTest(SEOTestBase):
 class PostDetailWithImageTest(SEOTestBase):
     @classmethod
     def _create_image(cls):
-        from django.core.files.uploadedfile import SimpleUploadedFile
         import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
         from PIL import Image
 
         img_io = io.BytesIO()

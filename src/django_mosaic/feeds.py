@@ -1,9 +1,8 @@
-from django.contrib.syndication.views import Feed
 from django.conf import settings
-
+from django.contrib.syndication.views import Feed
 from markdownify.templatetags.markdownify import markdownify
 
-from django_mosaic.models import Post, Namespace
+from django_mosaic.models import Namespace, Post
 
 
 class PostFeed(Feed):

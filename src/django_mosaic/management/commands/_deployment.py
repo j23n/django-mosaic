@@ -18,24 +18,20 @@ Design decisions:
 - Wrapper methods (_run, _sudo, _put) for consistent confirmation and logging
 """
 
-from django.core.management.utils import get_random_secret_key
-from django.conf import settings as django_settings
-from fabric import Connection
+import os
 import re
 import shlex
 import subprocess
 import tempfile
-import os
-import secrets
 from pathlib import Path
 
+from django.core.management.utils import get_random_secret_key
+from fabric import Connection
+
 from .config_manager import (
-    ConfigManager,
-    DEFAULT_INSTALL_PATH,
     DEFAULT_APP_NAME,
-    DEFAULT_GUNICORN_WORKERS,
-    DEFAULT_WSGI_MODULE,
-    DEFAULT_URL_CONF,
+    DEFAULT_INSTALL_PATH,
+    ConfigManager,
 )
 
 # Backup retention policy (number of backups to keep)
@@ -91,7 +87,7 @@ class DeploymentHandler:
     def load_template(self, filename):
         """Load a template file"""
         template_path = self.get_template_dir() / filename
-        with open(template_path, "r") as f:
+        with open(template_path) as f:
             return f.read()
 
     def validate_config(self, config):
@@ -186,7 +182,7 @@ class DeploymentHandler:
         # Show content for non-archive files
         if not remote_path.endswith((".tar.gz", ".tar", ".zip", ".tgz")):
             try:
-                with open(local_path, "r") as f:
+                with open(local_path) as f:
                     content = f.read()
 
                 self.stdout.write(self.style.SUCCESS("\n  Content:"))
@@ -466,7 +462,7 @@ class DeploymentHandler:
             user=self.config["user"],
             connect_kwargs=connect_kwargs,
         )
-        result = conn.run('echo "Connection successful"', hide=True)
+        conn.run('echo "Connection successful"', hide=True)
         self.stdout.write(self.style.SUCCESS(f'  ✓ Connected to {self.config["host"]}'))
         return conn
 

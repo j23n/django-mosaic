@@ -1,19 +1,19 @@
-from django.urls import path, include
-from django.contrib.sitemaps.views import sitemap
-from django_magic_authorization.urls import protected_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.sitemaps.views import sitemap
+from django.urls import include, path
+from django_magic_authorization.urls import protected_path
 
-from django_mosaic.views import (
-    post_list,
-    post_detail,
-    draft_detail,
-    home,
-    tag_detail,
-    robots_txt,
-)
 from django_mosaic.feeds import PostFeed
 from django_mosaic.sitemaps import PostSitemap
+from django_mosaic.views import (
+    draft_detail,
+    home,
+    post_detail,
+    post_list,
+    robots_txt,
+    tag_detail,
+)
 
 mosaic_patterns = [
     path("", home, name="ns-home"),

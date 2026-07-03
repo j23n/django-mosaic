@@ -1,12 +1,9 @@
 import reversion
+from django.contrib.auth.models import User
+from django.test import TestCase
 from reversion.models import Version
 
-from django.contrib.admin.sites import AdminSite
-from django.test import TestCase, RequestFactory
-from django.contrib.auth.models import User
-
-from django_mosaic.admin import PostAdmin
-from django_mosaic.models import Post, Namespace, Author
+from django_mosaic.models import Author, Namespace, Post
 
 
 class RevisionTestBase(TestCase):
@@ -58,9 +55,7 @@ class RevisionModelTest(RevisionTestBase):
 
 class DraftViewContentTest(RevisionTestBase):
     def test_draft_view_shows_latest_revision_content(self):
-        resp = self.client.get(
-            f"/public/posts/drafts/{self.draft_post.secret_id}"
-        )
+        resp = self.client.get(f"/public/posts/drafts/{self.draft_post.secret_id}")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Draft content here")
 
@@ -74,9 +69,7 @@ class DraftViewContentTest(RevisionTestBase):
             namespace=self.ns,
             is_published=True,
         )
-        resp = self.client.get(
-            f"/public/posts/drafts/{post.secret_id}"
-        )
+        resp = self.client.get(f"/public/posts/drafts/{post.secret_id}")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Fallback content")
 
@@ -90,15 +83,11 @@ class PublishedContentPropertyTest(RevisionTestBase):
 
     def test_published_content_falls_back_when_unset(self):
         self.draft_post.published_version_id = None
-        self.assertEqual(
-            self.draft_post.published_content, self.draft_post.content
-        )
+        self.assertEqual(self.draft_post.published_content, self.draft_post.content)
 
     def test_published_content_falls_back_when_version_deleted(self):
         self.draft_post.published_version_id = 999999
-        self.assertEqual(
-            self.draft_post.published_content, self.draft_post.content
-        )
+        self.assertEqual(self.draft_post.published_content, self.draft_post.content)
 
 
 class PublishedViewIsolationTest(RevisionTestBase):
@@ -110,9 +99,7 @@ class PublishedViewIsolationTest(RevisionTestBase):
         self.draft_post.save(update_fields=["published_version_id"])
 
         year = self.draft_post.published_at.year
-        resp = self.client.get(
-            f"/public/posts/{year}/{self.draft_post.slug}"
-        )
+        resp = self.client.get(f"/public/posts/{year}/{self.draft_post.slug}")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Original content")
         self.assertNotContains(resp, "Draft content here")
@@ -123,9 +110,7 @@ class PublishedViewIsolationTest(RevisionTestBase):
         self.draft_post.save(update_fields=["published_version_id"])
 
         year = self.draft_post.published_at.year
-        resp = self.client.get(
-            f"/public/posts/{year}/{self.draft_post.slug}"
-        )
+        resp = self.client.get(f"/public/posts/{year}/{self.draft_post.slug}")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Draft content here")
 
@@ -136,40 +121,30 @@ class PublishedViewIsolationTest(RevisionTestBase):
         self.draft_post.published_version_id = original.pk
         self.draft_post.save(update_fields=["published_version_id"])
 
-        resp = self.client.get(
-            f"/public/posts/drafts/{self.draft_post.secret_id}"
-        )
+        resp = self.client.get(f"/public/posts/drafts/{self.draft_post.secret_id}")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Draft content here")
 
 
 class DraftBannerTest(RevisionTestBase):
     def test_draft_banner_shown_on_draft_url(self):
-        resp = self.client.get(
-            f"/public/posts/drafts/{self.published_post.secret_id}"
-        )
+        resp = self.client.get(f"/public/posts/drafts/{self.published_post.secret_id}")
         self.assertContains(resp, "Draft preview")
 
     def test_draft_banner_not_shown_on_published_url(self):
         year = self.published_post.published_at.year
-        resp = self.client.get(
-            f"/public/posts/{year}/{self.published_post.slug}"
-        )
+        resp = self.client.get(f"/public/posts/{year}/{self.published_post.slug}")
         self.assertNotContains(resp, "Draft preview")
 
 
 class ReferrerPolicyTest(RevisionTestBase):
     def test_draft_response_has_no_referrer_header(self):
-        resp = self.client.get(
-            f"/public/posts/drafts/{self.published_post.secret_id}"
-        )
+        resp = self.client.get(f"/public/posts/drafts/{self.published_post.secret_id}")
         self.assertEqual(resp["Referrer-Policy"], "no-referrer")
 
     def test_published_response_has_no_referrer_policy(self):
         year = self.published_post.published_at.year
-        resp = self.client.get(
-            f"/public/posts/{year}/{self.published_post.slug}"
-        )
+        resp = self.client.get(f"/public/posts/{year}/{self.published_post.slug}")
         self.assertFalse(resp.has_header("Referrer-Policy"))
 
 
@@ -262,7 +237,11 @@ class AdminRevisionCreationTest(TestCase):
     def test_save_and_publish_pins_latest_version(self):
         self.client.post(
             f"/admin/django_mosaic/post/{self.post.pk}/change/",
-            {**self._post_data(content="publish me"), "_publish": "Save and publish", "_save": ""},
+            {
+                **self._post_data(content="publish me"),
+                "_publish": "Save and publish",
+                "_save": "",
+            },
         )
         self.post.refresh_from_db()
         latest = Version.objects.get_for_object(self.post).first()

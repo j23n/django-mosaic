@@ -1,9 +1,7 @@
-from django.test import TestCase
-from django.utils import timezone
-
-from django_mosaic.models import Post, Namespace, Author
-
 from django.contrib.auth.models import User
+from django.test import TestCase
+
+from django_mosaic.models import Author, Namespace, Post
 
 
 class PostIntegrityTestBase(TestCase):

@@ -1,21 +1,20 @@
 import html
-import markdown
-import reversion
-from reversion.models import Version
-import secrets
-from PIL import Image, ImageOps
-from io import BytesIO
 import logging
+import secrets
+from io import BytesIO
 
 import django.utils.timezone
+import markdown
+import reversion
 from django.conf import settings
-from django.utils.functional import cached_property
-from django.utils.text import slugify
-from django.utils.html import strip_tags
-from django.urls import reverse
-from django.db import models
-from django.utils.html import format_html
 from django.core.files.base import ContentFile
+from django.db import models
+from django.urls import reverse
+from django.utils.functional import cached_property
+from django.utils.html import format_html, strip_tags
+from django.utils.text import slugify
+from PIL import Image, ImageOps
+from reversion.models import Version
 
 logger = logging.getLogger("django_mosaic")
 

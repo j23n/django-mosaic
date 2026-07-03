@@ -2,10 +2,10 @@
 
 import io
 
-from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
+from django.test import TestCase
 from PIL import Image
 
 from django_mosaic.models import Author, ContentImage, Namespace, Post, Tag

@@ -2,13 +2,13 @@
 
 from unittest import mock
 
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import TestCase
-from django.contrib.auth.models import User
 
-from django_mosaic.models import Author, Namespace, Post
 from django_mosaic.atproto import reactions
 from django_mosaic.atproto.models import DocumentRecord
+from django_mosaic.models import Author, Namespace, Post
 
 THREAD_RESPONSE = {
     "thread": {

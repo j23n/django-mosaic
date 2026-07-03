@@ -1,14 +1,14 @@
 import reversion
+from django import forms
+from django.contrib import admin, messages
+from django.db import models
+from django.urls import path, reverse
+from django.utils.html import format_html
 from martor.widgets import AdminMartorWidget
 from reversion.admin import VersionAdmin
 from reversion.models import Version
 
-from django.contrib import admin, messages
-from django.db import models
-from django import forms
-from django.urls import path, reverse
-from django.utils.html import format_html
-from django_mosaic.models import Post, Tag, ContentImage, Author, RelMeLink
+from django_mosaic.models import Author, ContentImage, Post, RelMeLink, Tag
 from django_mosaic.uploads import upload_image
 
 
@@ -70,7 +70,18 @@ class PostAdminForm(forms.ModelForm):
 
     class Meta:
         model = Post
-        fields = "__all__"
+        fields = [
+            "author",
+            "title",
+            "content",
+            "slug",
+            "summary",
+            "namespace",
+            "is_published",
+            "tags",
+            "published_at",
+            "published_version",
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

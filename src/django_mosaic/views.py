@@ -1,6 +1,7 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from reversion.models import Version
-from django_mosaic.models import Namespace, Post, Tag, ContentImage
+
+from django_mosaic.models import ContentImage, Namespace, Post, Tag
 
 
 def _get_posts(namespace="public"):

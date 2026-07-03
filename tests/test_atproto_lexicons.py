@@ -163,8 +163,9 @@ class GenericFallbackTest(LexiconTestBase):
             ):
                 # Note: URL routes are built at import time from settings, so
                 # the default slugs stay mounted; render the view directly.
-                from django_mosaic.atproto.views import lexicon_page
                 from django.test import RequestFactory
+
+                from django_mosaic.atproto.views import lexicon_page
 
                 request = RequestFactory().get("/scrobbles")
                 resp = lexicon_page(request, page="scrobbles")

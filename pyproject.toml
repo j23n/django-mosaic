@@ -77,3 +77,25 @@ dev = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tests.settings"
 pythonpath = ["src", "."]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+extend-exclude = "migrations"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "DJ"]
+ignore = [
+    "E501",    # line length is handled by black
+    "B008",    # function calls in argument defaults (common in Django)
+    "DJ012",   # model member ordering — cosmetic, not worth churning working code
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+"__init__.py" = ["F401"]

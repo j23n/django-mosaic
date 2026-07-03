@@ -1,8 +1,8 @@
-from django.test import TestCase, Client
 from django.contrib.auth.models import User
+from django.test import TestCase
 from django.utils import timezone
 
-from django_mosaic.models import Post, Namespace, Author, Tag
+from django_mosaic.models import Author, Namespace, Post
 
 
 class AccessControlTestBase(TestCase):

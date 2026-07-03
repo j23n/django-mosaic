@@ -9,10 +9,10 @@ Usage:
 
 from django.core.management.base import BaseCommand, CommandError
 
-from django_mosaic.models import Post
 from django_mosaic.atproto import conf, publisher
 from django_mosaic.atproto.client import Session
 from django_mosaic.atproto.models import DocumentRecord, PublicationRecord
+from django_mosaic.models import Post
 
 
 class Command(BaseCommand):

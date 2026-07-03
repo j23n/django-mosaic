@@ -5,12 +5,12 @@ All network I/O is mocked at the Session/client boundary.
 
 from unittest import mock
 
-from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
+from django.test import TestCase, override_settings
 
-from django_mosaic.models import Author, Namespace, Post
 from django_mosaic.atproto import conf, publisher
 from django_mosaic.atproto.models import DocumentRecord, PublicationRecord
+from django_mosaic.models import Author, Namespace, Post
 
 
 class FakeSession:

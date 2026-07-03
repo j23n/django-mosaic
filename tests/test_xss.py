@@ -1,12 +1,11 @@
 from unittest.mock import MagicMock
 
-from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User
-from django.utils.html import format_html
+from django.test import TestCase
 
-from django_mosaic.models import Post, Namespace, Author, ContentImage
-from django_mosaic.feeds import PostFeed
 from django_mosaic.admin import ContentImageInlineAdmin
+from django_mosaic.feeds import PostFeed
+from django_mosaic.models import Author, ContentImage, Namespace, Post
 
 
 class ContentImageMarkdownEscapingTest(TestCase):
@@ -30,9 +29,7 @@ class ContentImageMarkdownEscapingTest(TestCase):
         self.assertIn("&#x27;", html)
 
     def test_caption_script_tag_is_escaped(self):
-        img = self._make_image(
-            alt="ok", caption="<script>alert('xss')</script>"
-        )
+        img = self._make_image(alt="ok", caption="<script>alert('xss')</script>")
         html = img.markdown()
         self.assertNotIn("<script>", html)
         self.assertIn("&lt;script&gt;", html)

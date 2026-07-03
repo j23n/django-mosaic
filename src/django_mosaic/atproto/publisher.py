@@ -10,7 +10,6 @@ import html
 import logging
 
 import markdown as md
-
 from django.utils import timezone
 from django.utils.html import strip_tags
 

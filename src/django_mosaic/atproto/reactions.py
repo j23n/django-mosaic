@@ -15,7 +15,6 @@ without that data. A third-party index being down must never 500 a post page.
 import logging
 
 import requests
-
 from django.core.cache import cache
 
 from . import conf

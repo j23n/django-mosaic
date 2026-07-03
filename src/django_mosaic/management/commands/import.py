@@ -1,12 +1,12 @@
-from pathlib import Path
 import logging
+from pathlib import Path
 
 import yaml
 from dateutil import parser as date_parser
-
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
-from django_mosaic.models import Author, Post, Tag, Namespace
+
+from django_mosaic.models import Author, Namespace, Post, Tag
 
 EXPECTED_KEYWORDS = ["title", "date", "draft"]
 
@@ -46,8 +46,8 @@ class Command(BaseCommand):
         if username:
             try:
                 return Author.objects.get(user__username=username)
-            except Author.DoesNotExist:
-                raise CommandError(f"No Author found for user '{username}'.")
+            except Author.DoesNotExist as e:
+                raise CommandError(f"No Author found for user '{username}'.") from e
         authors = list(Author.objects.all()[:2])
         if len(authors) == 1:
             return authors[0]
@@ -60,15 +60,17 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
             ns = Namespace.objects.get(name=options["category"])
-        except Namespace.DoesNotExist:
-            raise CommandError(f"Namespace '{options['category']}' does not exist.")
+        except Namespace.DoesNotExist as e:
+            raise CommandError(
+                f"Namespace '{options['category']}' does not exist."
+            ) from e
 
         author = self._resolve_author(options["author"])
 
         for file in options["path"].glob("**/*.md"):
             logger.info(f"Importing {file}")
             try:
-                with open(file, "r") as f:
+                with open(file) as f:
                     file_content = f.read()
                 _, header_raw, content = file_content.split("---", maxsplit=2)
                 header = yaml.safe_load(header_raw) or {}
