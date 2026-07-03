@@ -23,7 +23,23 @@ INSTALLED_APPS = [
     "martor",
     "django_magic_authorization",
     "django_mosaic",
+    "django_mosaic.atproto",
 ]
+
+MOSAIC_ATPROTO = {
+    "HANDLE": "blog.example.com",
+    "APP_PASSWORD": "test-app-password",
+    "DID": "did:plc:testuser123",
+    "PDS_URL": "https://pds.example.com",
+    "PUBLICATION": {
+        "NAME": "Test Blog",
+        "URL": "https://blog.example.com",
+        "DESCRIPTION": "A test blog.",
+    },
+    # Individual tests opt in via override_settings + captureOnCommitCallbacks
+    # so the suite never fires network syncs implicitly.
+    "AUTO_PUBLISH": False,
+}
 
 # Martor markdown editor (admin)
 MARTOR_THEME = "bootstrap"

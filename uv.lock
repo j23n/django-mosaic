@@ -415,6 +415,7 @@ dependencies = [
     { name = "pygments" },
     { name = "python-dateutil" },
     { name = "pyyaml" },
+    { name = "requests" },
 ]
 
 [package.optional-dependencies]
@@ -445,6 +446,7 @@ requires-dist = [
     { name = "pygments", specifier = ">=2.19.2" },
     { name = "python-dateutil", specifier = ">=2.9.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "requests", specifier = ">=2.34.2" },
 ]
 provides-extras = ["deploy"]
 

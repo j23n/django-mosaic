@@ -196,6 +196,24 @@ MARKDOWNIFY = {
 }
 
 
+# ATProto bridge (optional). Add "django_mosaic.atproto" to INSTALLED_APPS,
+# include "django_mosaic.atproto.urls" at the project root, and configure:
+#
+# MOSAIC_ATPROTO = {
+#     "HANDLE": "example.com",
+#     "APP_PASSWORD": os.environ.get("ATPROTO_APP_PASSWORD", ""),
+#     "PUBLICATION": {
+#         "NAME": CONSTANTS["site"]["title"],
+#         "URL": "https://example.com",
+#         "DESCRIPTION": CONSTANTS["site"]["description"],
+#     },
+# }
+#
+# Published public posts then sync to your PDS as site.standard.document
+# records with a companion Bluesky post. See django_mosaic/atproto/conf.py
+# for all options.
+
+
 # Security hardening (active when DEBUG is off).
 # nginx terminates TLS and forwards X-Forwarded-Proto, so Django must trust it
 # to build https:// absolute URLs (canonical tags, og:url, sitemap).

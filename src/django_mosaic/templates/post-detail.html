@@ -3,6 +3,8 @@
 
 {% block head_extra %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3/dist/css/glightbox.min.css">
+{# ATProto document verification; resolves only when the atproto bridge is installed and this post is synced. #}
+{% if post.atproto_document.uri %}<link rel="site.standard.document" href="{{ post.atproto_document.uri }}">{% endif %}
 {% endblock %}
 
 {% block title %} - {{ post.title }}{% endblock %}
