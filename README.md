@@ -65,6 +65,34 @@ Hit the save button and go to https://localhost:8000
 
 Have fun!
 
+## ATProto / ATmosphere (optional)
+
+Mosaic can act as a bridge to the [AT Protocol](https://atproto.com): published
+public posts sync to your PDS as [standard.site](https://standard.site)
+documents with a companion Bluesky post, replies to that post render as your
+comment section, and cross-app reactions (recommends, stars, favorites) are
+counted via the Constellation backlink index. Your other ATProto content —
+[Tangled](https://tangled.org) repositories, [BookHive](https://bookhive.buzz)
+books, or any lexicon collection — can be rendered as pages on your site
+straight from your repo, no local models needed.
+
+Enable it by adding `django_mosaic.atproto` to `INSTALLED_APPS`, including
+`django_mosaic.atproto.urls` at your project root, and configuring the
+`MOSAIC_ATPROTO` setting (see `django_mosaic/atproto/conf.py` for all
+options):
+
+```python
+MOSAIC_ATPROTO = {
+    "HANDLE": "example.com",
+    "APP_PASSWORD": os.environ["ATPROTO_APP_PASSWORD"],
+    "PUBLICATION": {"NAME": "My Blog", "URL": "https://example.com"},
+}
+```
+
+Customize collection pages (e.g. `/projects`) by overriding
+`lexicons/<collection NSID>.html` — the same template-override mechanism as
+the rest of mosaic. Drafts and the private namespace never leave your server.
+
 ## Deployment
 
 To reduce one of the major pains of running your own site, Mosaic includes automated deployment for VPS hosting with sane (reach out if not!) defaults for Docker, nginx, and SSL certificates.

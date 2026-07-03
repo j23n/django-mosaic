@@ -50,7 +50,7 @@
 				{% include "includes/hcard.html" %}
 				<div class="footer-links">
 					<ul class="list-plain">
-					<li>Subscribe with <a href="{% url 'feed' namespace %}" class="muted">RSS</a>.</li>
+					<li>Subscribe with <a href="{% if namespace %}{% url 'feed' namespace %}{% else %}{% url 'feed' 'public' %}{% endif %}" class="muted">RSS</a>.</li>
 					<li>Made for the <a href="https://indieweb.org" class="muted">indieweb</a> with <a href="https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD" class="muted">Mosaic</a>.</li>
 					{% block footer_extra %}{% endblock %}
 					</ul>

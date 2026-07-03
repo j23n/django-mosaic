@@ -1,0 +1,17 @@
+{% comment %}
+Fallback renderer for lexicon collections without a dedicated template.
+Create lexicons/<collection NSID>.html in your project to replace it.
+{% endcomment %}
+<article class="lexicon-generic">
+  <details>
+    <summary>
+      <code>{{ record.rkey }}</code>
+      {% if record.value.title %}— {{ record.value.title }}{% elif record.value.name %}— {{ record.value.name }}{% endif %}
+    </summary>
+    <dl>
+      {% for key, value in record.value.items %}
+      {% if key != "$type" %}<dt><code>{{ key }}</code></dt><dd>{{ value|truncatechars:300 }}</dd>{% endif %}
+      {% endfor %}
+    </dl>
+  </details>
+</article>

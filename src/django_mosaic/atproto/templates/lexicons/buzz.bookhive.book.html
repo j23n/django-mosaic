@@ -1,0 +1,21 @@
+{% comment %}
+One BookHive book (buzz.bookhive.book). Fields: title, authors (tab-
+separated), status (lexicon token), stars (half-stars 1-10), review,
+startedAt/finishedAt, cover (blob). Override this file in your project to
+restyle the books page entries.
+{% endcomment %}
+{% load mosaic_atproto %}
+<article class="bookhive-book">
+  {% if record.value.cover %}
+  <img class="bookhive-cover" src="{{ record.value.cover|blob_url }}" alt="Cover of {{ record.value.title }}" loading="lazy" style="max-height: 120px; float: left; margin-right: 1em;">
+  {% endif %}
+  <strong>{{ record.value.title }}</strong>
+  {% if record.value.authors %}<span class="muted"> by {{ record.value.authors|tabbed }}</span>{% endif %}
+  <div class="bookhive-meta muted">
+    {% if record.value.status %}<span class="bookhive-status">{{ record.value.status|token_name }}</span>{% endif %}
+    {% if record.value.stars %} · <span class="bookhive-stars">{{ record.value.stars|half_stars }}★</span>{% endif %}
+    {% if record.value.finishedAt %} · <time datetime="{{ record.value.finishedAt }}">{{ record.value.finishedAt|slice:":10" }}</time>{% endif %}
+  </div>
+  {% if record.value.review %}<blockquote class="bookhive-review">{{ record.value.review }}</blockquote>{% endif %}
+  <div style="clear: both;"></div>
+</article>

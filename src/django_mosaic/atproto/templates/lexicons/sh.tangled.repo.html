@@ -1,0 +1,11 @@
+{% comment %}
+One Tangled repository (sh.tangled.repo). Fields: name, description, knot
+(the git server hosting it), createdAt. Override this file in your project
+to restyle the projects page entries.
+{% endcomment %}
+{% load mosaic_atproto %}
+<article class="tangled-repo">
+  <strong><a href="https://tangled.org/@{% atproto_handle %}/{{ record.value.name }}">{{ record.value.name }}</a></strong>
+  {% if record.value.description %}<span class="muted"> — {{ record.value.description }}</span>{% endif %}
+  {% if record.value.knot %}<small class="muted"> ({{ record.value.knot }})</small>{% endif %}
+</article>

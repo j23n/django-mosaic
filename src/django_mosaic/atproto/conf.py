@@ -21,6 +21,14 @@ Example::
         "AUTO_PUBLISH": True,                 # publish on save when is_published
         "COMPANION_POST": True,               # create an app.bsky.feed.post
         "COMPANION_TEXT": "New post: {title}\n\n{url}",
+        # Root-level pages rendering collections from your repo. Customize a
+        # page by overriding lexicons/<collection NSID>.html (one record),
+        # lexicons/pages/<slug>.html (whole page), or lexicon-page.html in
+        # your project templates.
+        "LEXICON_PAGES": {
+            "projects": {"collection": "sh.tangled.repo", "title": "Projects"},
+            "books": {"collection": "buzz.bookhive.book", "title": "Books"},
+        },
     }
 """
 

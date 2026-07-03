@@ -10,7 +10,8 @@ Include at the project root so the well-known paths land on the domain root::
 
 from django.urls import path
 
-from .views import wellknown_atproto_did, wellknown_publication
+from . import lexicons
+from .views import lexicon_page, wellknown_atproto_did, wellknown_publication
 
 urlpatterns = [
     path(
@@ -23,4 +24,11 @@ urlpatterns = [
         wellknown_publication,
         name="atproto-publication",
     ),
+]
+
+# One root-level route per configured lexicon page (/projects, /books, ...).
+# Include this urlconf before mosaic's namespace catch-all so these win.
+urlpatterns += [
+    path(slug, lexicon_page, kwargs={"page": slug}, name=f"lexicon-{slug}")
+    for slug in lexicons.pages()
 ]

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% comment %}
+Generic lexicon collection page. Customize a specific page by overriding
+lexicons/pages/<slug>.html (whole page) or lexicons/<collection NSID>.html
+(one record) in your project's template directory.
+{% endcomment %}
+
+{% block title %} - {{ title }}{% endblock %}
+
+{% block content %}
+<h2>{{ title }}</h2>
+{% if records %}
+<ul class="lexicon-records list-plain">
+  {% for record in records %}
+  <li class="lexicon-record">{% include record_template %}</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="muted">Nothing here yet.</p>
+{% endif %}
+{% endblock %}
