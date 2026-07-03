@@ -16,7 +16,24 @@ or
 pip install django-mosaic
 ```
 
-Second, you need to enable the app in your Django project.
+### Fastest start: scaffold a project
+
+If you don't already have a Django project, generate a complete, runnable one:
+
+```bash
+mosaic-admin init myblog
+cd myblog
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
+```
+
+This writes a flat project (`manage.py`, `settings.py`, `urls.py`, `wsgi.py`,
+`asgi.py`, a `.env`, and starter templates) already configured for mosaic.
+
+### Add to an existing project
+
+Enable the app in your Django project.
 
 ```python
 # settings.py
@@ -27,7 +44,7 @@ INSTALLED_APPS = [
 ]
 ```
 
-Third, run the migrations to add the relevant schemas to your database
+Then run the migrations to add the relevant schemas to your database
 
 ```bash
 uv run python manage.py migrate

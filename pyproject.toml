@@ -48,6 +48,10 @@ deploy = [
     "fabric>=3.2.2",
 ]
 
+[project.scripts]
+# Bootstrap a runnable project: `mosaic-admin init myblog`.
+mosaic-admin = "django_mosaic.scaffold:main"
+
 [project.urls]
 Homepage = "https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD"
 Repository = "https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD"
