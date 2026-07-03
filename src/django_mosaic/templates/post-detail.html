@@ -58,6 +58,9 @@ by <a class="muted p-author h-card" href="{% url 'home' %}">{{ post.author.user.
 </div>
 </article>
 
+{# ATmosphere reactions/comments; renders only when the atproto bridge is installed and the post is synced. #}
+{% if post.atproto_document %}{% include "atproto/reactions.html" %}{% endif %}
+
 <div class="post-nav">
 <div class="prev">{% if prev_post %}Previous: <a href="{{ prev_post.get_absolute_url }}" class="muted">{{ prev_post.title|truncatechars:20 }}</a>{% else %}This was the last post{% endif %}</div>
 <div class="next">{% if next_post %}Next: <a href="{{ next_post.get_absolute_url }}" class="muted">{{ next_post.title|truncatechars:20 }}</a>{% else %}None yet :-){% endif %}</div>

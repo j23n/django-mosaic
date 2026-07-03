@@ -1,0 +1,43 @@
+{% load mosaic_atproto %}
+{% atproto_reactions post as reactions %}
+{% if reactions %}
+<section class="atproto-reactions">
+  <hr>
+  {% with thread=reactions.thread %}
+  {% if thread %}
+  <div class="atproto-reactions-counts">
+    <span title="Likes on Bluesky">♥ {{ thread.like_count }}</span>
+    <span title="Reposts on Bluesky">🔁 {{ thread.repost_count }}</span>
+    {% for item in reactions.crossapp %}
+    <span title="{{ item.collection }}">{{ item.count }} {{ item.label }}</span>
+    {% endfor %}
+    {% if thread.web_url %}
+    · <a class="muted" href="{{ thread.web_url }}">Reply on Bluesky</a>
+    {% endif %}
+  </div>
+
+  {% if thread.replies %}
+  <div class="atproto-comments h-feed">
+    <h3>Comments <small class="muted">(via Bluesky)</small></h3>
+    {% for reply in thread.replies %}
+    <article class="atproto-comment h-entry" {% if reply.depth %}style="margin-left: {{ reply.depth }}em"{% endif %}>
+      <div class="atproto-comment-meta">
+        {% if reply.avatar %}<img class="atproto-comment-avatar u-photo" src="{{ reply.avatar }}" alt="" width="24" height="24" loading="lazy">{% endif %}
+        <a class="p-author muted" href="https://bsky.app/profile/{{ reply.handle }}">{{ reply.display_name }}</a>
+        <a class="u-url muted" href="{{ reply.web_url }}"><time class="dt-published" datetime="{{ reply.created_at }}">{{ reply.created_at|slice:":10" }}</time></a>
+      </div>
+      <p class="e-content">{{ reply.text }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% elif reactions.crossapp %}
+  <div class="atproto-reactions-counts">
+    {% for item in reactions.crossapp %}
+    <span title="{{ item.collection }}">{{ item.count }} {{ item.label }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+</section>
+{% endif %}
