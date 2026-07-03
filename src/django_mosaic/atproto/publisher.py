@@ -65,8 +65,10 @@ def ensure_publication(session):
     )
 
 
-def _upload_thumb(session, post):
-    """Upload the post's thumbnail as a blob, if present and small enough."""
+def _upload_cover(session, post):
+    """Upload the post's featured thumbnail as a blob, once, for reuse as both
+    the document coverImage and the companion post's embed thumb. The 600px
+    thumb is safely under the 1 MB standard.site blob limit."""
     image = post.featured_image
     if not image or not image.thumb:
         return None
@@ -80,6 +82,21 @@ def _upload_thumb(session, post):
     if len(data) > BLOB_MAX_BYTES:
         return None
     return session.upload_blob(data, "image/jpeg")
+
+
+def _content_block(post):
+    """Mosaic-native markdown entry for the document's open `content` union.
+
+    Returns None when the markdown is too large to embed inline safely."""
+    markdown_source = post.published_content or ""
+    if len(markdown_source.encode("utf-8")) > conf.get_setting(
+        "CONTENT_MAX_INLINE_BYTES"
+    ):
+        return None
+    return {
+        "$type": conf.get_setting("CONTENT_NSID"),
+        "markdown": markdown_source,
+    }
 
 
 def _create_companion_post(session, post, thumb_blob):
@@ -103,7 +120,7 @@ def _create_companion_post(session, post, thumb_blob):
     return session.create_record(conf.BSKY_POST_NSID, record)
 
 
-def build_document(post, publication_uri, bsky_post_ref=None):
+def build_document(post, publication_uri, bsky_post_ref=None, cover_blob=None):
     record = {
         "$type": conf.DOCUMENT_NSID,
         "site": publication_uri,
@@ -114,6 +131,11 @@ def build_document(post, publication_uri, bsky_post_ref=None):
         "tags": [t.name for t in post.tags.all()],
         "publishedAt": _iso(post.published_at or timezone.now()),
     }
+    content_block = _content_block(post)
+    if content_block:
+        record["content"] = [content_block]
+    if cover_blob:
+        record["coverImage"] = cover_blob
     tracked = DocumentRecord.objects.filter(post=post).first()
     if tracked:
         record["updatedAt"] = _iso(timezone.now())
@@ -131,15 +153,17 @@ def publish_post(post, session=None):
     publication = ensure_publication(session)
     tracked = DocumentRecord.objects.filter(post=post).first()
 
+    # Upload the featured thumbnail once; reuse for coverImage + companion embed.
+    cover_blob = _upload_cover(session, post)
+
     bsky_post_ref = None
     if tracked and tracked.bsky_post_uri:
         bsky_post_ref = {"uri": tracked.bsky_post_uri, "cid": tracked.bsky_post_cid}
     elif conf.get_setting("COMPANION_POST"):
-        thumb_blob = _upload_thumb(session, post)
-        companion = _create_companion_post(session, post, thumb_blob)
+        companion = _create_companion_post(session, post, cover_blob)
         bsky_post_ref = {"uri": companion["uri"], "cid": companion["cid"]}
 
-    record = build_document(post, publication.uri, bsky_post_ref)
+    record = build_document(post, publication.uri, bsky_post_ref, cover_blob)
 
     if tracked:
         result = session.put_record(conf.DOCUMENT_NSID, tracked.rkey, record)

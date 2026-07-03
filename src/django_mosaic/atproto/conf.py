@@ -53,6 +53,15 @@ DEFAULTS = {
     # makes a live call) and returns nothing on a miss. Warm the cache out of
     # band with `manage.py atproto warm`. Recommended for high-traffic sites.
     "REACTIONS_BLOCKING": True,
+    # NSID for the mosaic-native rich-content block embedded in the document's
+    # open `content` union. Preserves the source markdown in your repo (so a
+    # mosaic AppView or re-import reconstructs the post faithfully); other
+    # AppViews fall back to textContent. Override with your own domain-based
+    # NSID if you publish a lexicon for it.
+    "CONTENT_NSID": "blog.mosaic.content.markdown",
+    # Skip the inline content block above this size (bytes) to avoid 413s
+    # against the PDS record-size limit; textContent still carries the post.
+    "CONTENT_MAX_INLINE_BYTES": 30_000,
 }
 
 DOCUMENT_NSID = "site.standard.document"

@@ -3,14 +3,24 @@
 All network I/O is mocked at the Session/client boundary.
 """
 
+import io
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from PIL import Image
 
 from django_mosaic.atproto import conf, publisher
 from django_mosaic.atproto.models import DocumentRecord, PublicationRecord
-from django_mosaic.models import Author, Namespace, Post
+from django_mosaic.models import Author, ContentImage, Namespace, Post
+
+
+def _make_image(name="cover.png"):
+    buf = io.BytesIO()
+    Image.new("RGB", (120, 90), (40, 80, 120)).save(buf, format="PNG")
+    buf.seek(0)
+    return SimpleUploadedFile(name, buf.read(), content_type="image/png")
 
 
 class FakeSession:
@@ -97,6 +107,36 @@ class PublisherTest(BridgeTestBase):
         self.assertEqual(PublicationRecord.objects.count(), 1)
         self.assertEqual(record.post, post)
         self.assertTrue(record.bsky_post_uri)
+
+        # The document carries a mosaic-native markdown content block that
+        # preserves the source (other AppViews fall back to textContent).
+        self.assertIn("content", doc)
+        block = doc["content"][0]
+        self.assertEqual(block["$type"], conf.get_setting("CONTENT_NSID"))
+        self.assertIn("**markdown**", block["markdown"])
+
+    def test_large_content_skips_inline_block(self):
+        post = self.make_post(content="x" * 40_000)
+        session = FakeSession()
+        publisher.publish_post(post, session=session)
+        doc = next(c[2] for c in session.calls if c[1] == conf.DOCUMENT_NSID)
+        # Too large to embed safely; textContent still carries it.
+        self.assertNotIn("content", doc)
+        self.assertTrue(doc["textContent"])
+
+    def test_cover_image_uploaded_once_and_reused(self):
+        post = self.make_post()
+        ContentImage.objects.create(post=post, image=_make_image(), alt="cover")
+        session = FakeSession()
+        publisher.publish_post(post, session=session)
+
+        blob_uploads = [c for c in session.calls if c[0] == "blob"]
+        self.assertEqual(len(blob_uploads), 1, "cover blob uploaded exactly once")
+
+        doc = next(c[2] for c in session.calls if c[1] == conf.DOCUMENT_NSID)
+        companion = next(c[2] for c in session.calls if c[1] == conf.BSKY_POST_NSID)
+        self.assertIn("coverImage", doc)
+        self.assertEqual(doc["coverImage"], companion["embed"]["external"]["thumb"])
 
     def test_republish_updates_same_rkey_and_keeps_companion(self):
         post = self.make_post()
