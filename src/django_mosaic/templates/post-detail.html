@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% load markdownify %}
+{% load markdownify static %}
 
 {% block head_extra %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3/dist/css/glightbox.min.css">
+<link rel="stylesheet" href="{% static 'mosaic/vendor/glightbox/glightbox.min.css' %}">
 {# ATProto document verification; resolves only when the atproto bridge is installed and this post is synced. #}
 {% if post.atproto_document.uri %}<link rel="site.standard.document" href="{{ post.atproto_document.uri }}">{% endif %}
 {% endblock %}
@@ -65,7 +65,7 @@ by <a class="muted p-author h-card" href="{% url 'home' %}">{{ post.author.user.
 <div class="prev">{% if prev_post %}Previous: <a href="{{ prev_post.get_absolute_url }}" class="muted">{{ prev_post.title|truncatechars:20 }}</a>{% else %}This was the last post{% endif %}</div>
 <div class="next">{% if next_post %}Next: <a href="{{ next_post.get_absolute_url }}" class="muted">{{ next_post.title|truncatechars:20 }}</a>{% else %}None yet :-){% endif %}</div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/glightbox@3/dist/js/glightbox.min.js"></script>
+<script src="{% static 'mosaic/vendor/glightbox/glightbox.min.js' %}"></script>
 <script>
 document.querySelectorAll('.e-content figcaption').forEach(fc => {
     const a = fc.parentElement.querySelector('a');
