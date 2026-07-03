@@ -74,6 +74,10 @@ since ~June 2026):
 
 ## Architecture: hybrid source of truth
 
+*(See the next section for the leaner pure-AppView variant, which is probably
+the better fit for a single-person site — this section kept for the tradeoff
+analysis.)*
+
 Two pure options, and the hybrid that actually makes sense:
 
 - **A. Django-canonical, mirror to PDS on publish.** Like the WordPress plugin.
@@ -120,6 +124,113 @@ class AtRecord(models.Model):        # generic cache of own-repo records
 Renderers are then a registry `{NSID: template/component}` — exactly the
 pattern of tynanpurdy/at-home and flo-bit/blento, which do this today and are
 worth reading.
+
+## Leaner alternative: mosaic as a pure AppView
+
+The hybrid above carries a hidden tax: a mapping/serde layer between Django
+models and lexicon records, maintained per content type, in both directions.
+For a single-person site none of that is necessary. The lean version:
+
+**The PDS is the only source of truth. Mosaic renders records; it doesn't
+model them.**
+
+### No models, just templates
+
+Records are JSON. Django templates read dicts natively
+(`{{ record.value.title }}`), so the per-lexicon cost drops from
+"model + serializer + migration" to **one template per NSID you care about**,
+plus a generic fallback for everything else:
+
+```
+templates/lexicons/
+  site.standard.document.html
+  sh.tangled.repo.html
+  social.grain.gallery.html
+  _generic.html          # dump anything unknown, readably
+```
+
+A view resolves `collection` → template and passes the raw record through.
+There is deliberately no validation layer — it's your own data, and
+missing-key rendering degrades gracefully (an unknown/evolved field renders
+as blank), which is *more* robust to lexicon evolution than typed models
+that break on drift.
+
+### No ingest pipeline either (at first)
+
+Skip Jetstream, skip the cache table. Pages call the PDS's XRPC directly at
+request time (`listRecords`, `getRecord`) and wrap results in Django's cache
+framework with a short TTL. A personal site's traffic against a PDS on
+localhost (or even bsky.social over the network) is nothing. Publishing busts
+the cache — you know when you posted, because it's your site.
+
+Two facts make request-time reads workable without any local index:
+
+- **rkeys are TIDs** — timestamp-ordered — so `listRecords(reverse=true)` is
+  reverse-chronological for free; a mixed home timeline is a k-way merge of
+  a few sorted lists.
+- Personal-scale data (hundreds to low thousands of records per collection)
+  can be filtered in Python at request time. Tag pages don't need an index
+  table until they measurably do — and if that day comes, add a single
+  denormalized `(at_uri, tag)` table populated lazily, not a model layer.
+
+### Authoring moves to the ecosystem (mostly)
+
+A pure AppView doesn't write. Posts get authored in Leaflet or pckt (which
+have drafts, stored off-PDS on their side), photos in Grain, repos in
+Tangled — mosaic just shows the aggregate. This deletes the write path,
+the blob upload code, and the versioning bridge entirely.
+
+The pragmatic exception: if the mosaic admin authoring flow (markdown,
+drafts, reversion, secret preview links) is worth keeping — and it's arguably
+mosaic's soul — keep it for **one lexicon only**. Drafts stay local exactly
+as today; the publish transition does a single `putRecord` of a
+`site.standard.document` + companion Bluesky post. That's ~200 lines against
+one schema, not a serde framework. Local `Post` rows for anything published
+become disposable (the PDS copy is canonical; local drafts are the only
+unrecoverable state).
+
+What stays in Django either way: the private namespace + magic-link/OAuth
+gating and draft secret links — those are off-protocol features by design
+(see § Private content), not lexicon data.
+
+### Self-hosting the PDS on the same box
+
+Orthogonal decision, but attractive here:
+
+- The reference PDS is a single low-maintenance container (SQLite per
+  account + blob directory). Mosaic's deployment tooling
+  (`manage.py mosaic deployment`) already provisions Docker + nginx +
+  certbot on a VPS — adding a `pds` service and a `pds.example.com` vhost
+  (with websocket upgrade for `subscribeRepos`) is squarely within its
+  existing job. The hourly backup task covers the PDS data dir too.
+- Handle stays `example.com` via `/.well-known/atproto-did` served by Django;
+  the PDS itself lives on the subdomain.
+- Same-box reads are loopback XRPC — effectively free, which is what makes
+  the "no cache, no ingest" posture comfortable. (Use XRPC even locally;
+  the PDS's SQLite layout is not a supported interface.)
+- If you later want live inbound-interaction updates, your own PDS exposes
+  `com.atproto.sync.subscribeRepos` directly — no relay or Jetstream
+  dependency for your own writes.
+- Costs to respect: you're now hosting your identity. Keep did:plc rotation
+  keys offline, back up CAR exports, and make sure the relay crawls you
+  (`requestCrawl`) so Bluesky/AppViews see your content. If that
+  responsibility isn't appealing, the identical architecture works against a
+  bsky.social-hosted PDS — "same machine" is an optimization, not a
+  requirement. Decouple the two decisions; adopt the AppView architecture
+  first, move the PDS later or never.
+
+### What the lean architecture gives up
+
+- Full-text search, tag indexes, and cross-collection queries need either
+  request-time Python or small denormalized tables added on demand.
+- The Django admin is no longer the editor for anything except the one kept
+  lexicon (and private posts).
+- Mosaic-the-reusable-package tension: a pure AppView assumes its users
+  author in other ATProto apps. Fine for a personal deployment; it changes
+  what `django-mosaic` *is* if shipped upstream. (A sibling app —
+  `django_mosaic.atproto` or a separate package — that provides the
+  record-view + template registry keeps the core CMS intact for non-ATProto
+  users.)
 
 ## What else lives in a PDS repo (the aggregation payoff)
 
