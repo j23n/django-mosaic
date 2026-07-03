@@ -392,6 +392,51 @@ Each phase is independently shippable and useful:
    DID allowlist alongside magic links. Watch proposal 0016; adopt
    permissioned data when real.
 
+## Base platform: build on mosaic or something else?
+
+Constraints: solid authoring editor, local drafts, private namespace stays
+local, published+public pushed to the PDS as `site.standard.document`.
+
+Candidates (verification level varies — WordPress plugin and EmDash were only
+seen referenced in ecosystem lists, not evaluated in depth):
+
+- **Wagtail** (Django) — the strongest "real CMS" base in this ecosystem:
+  best-in-class Django editor (StreamField blocks + rich text), first-class
+  drafts/revisions/scheduled publishing, per-page privacy restrictions
+  (login/password/group) that map directly onto namespaces, and a
+  `page_published` signal that is exactly the putRecord hook. No known
+  atproto integration exists — the ATProto layer from this doc would be a new
+  `wagtail-atproto` package. StreamField → `textContent` is easy;
+  StreamField → any rich content union is lossy by design (ship the canonical
+  URL).
+- **WordPress + existing standard.site plugin** — least work today; plugin
+  already publishes a record per post; WP has drafts/private/password posts
+  natively. Cost: it's WordPress (PHP, heavy, not "yours").
+- **Ghost** — arguably the best editor anywhere, has memberships (gated
+  content) natively, but Node and zero atproto story; integration would be a
+  small external bridge consuming `post.published` webhooks. Two services to
+  run.
+- **Leaflet / pckt (split stack)** — author public posts in their editors
+  (Leaflet's is collaborative and good; drafts live off-PDS on their side;
+  standard.site publishing is native), keep mosaic solely for the private
+  namespace. Zero build for the public half; tradeoff is authoring on
+  someone else's infra and their custom-domain/publication feature set.
+- **Static SSG + Sequoia CLI** — markdown in git as "drafts", Sequoia pushes
+  standard.site records on build. Leanest possible, but no private namespace
+  (static) and no editor to speak of.
+- **Keep mosaic** — already has drafts + reversion + pinned versions, secret
+  preview links, the private namespace with gating, and deployment
+  automation; the ATProto delta is one publish path (~one lexicon). Its real
+  gap vs. the above is editor quality (a markdown textarea in the admin) —
+  addressable with an editor widget (EasyMDE/martor-style) at far lower cost
+  than a platform migration.
+
+Design consequence regardless of choice: **build the ATProto publishing piece
+as its own small decoupled package** (publish/update/delete a
+`site.standard.document` + companion Bluesky post, given plain values) so the
+CMS choice stays swappable — mosaic today, Wagtail later, without rewriting
+the protocol code.
+
 ## Open questions
 
 - Content format in `document.content`: define a mosaic markdown lexicon
