@@ -72,7 +72,9 @@ class ContentImage(models.Model):
     caption = models.CharField(max_length=2048, null=False, blank=True, default="")
     alt = models.CharField(max_length=2048, null=False, blank=True, default="")
     is_featured = models.BooleanField(default=False)
-    post = models.ForeignKey("Post", on_delete=models.CASCADE)
+    # Nullable: editor uploads on the "add post" form happen before the post
+    # exists; they attach later (or stay unattached as library images).
+    post = models.ForeignKey("Post", on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return "Image"

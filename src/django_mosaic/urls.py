@@ -28,6 +28,9 @@ urlpatterns = [
     path("", home, name="home"),
     path("sitemap.xml", sitemap, {"sitemaps": {"posts": PostSitemap}}, name="sitemap"),
     path("robots.txt", robots_txt, name="robots-txt"),
+    # Martor editor endpoints (live preview). Must precede the namespace
+    # catch-all or "martor" would be treated as a namespace.
+    path("martor/", include("martor.urls")),
     path("<slug:namespace>/", include(mosaic_patterns)),
     protected_path(
         "private/", include(mosaic_patterns), kwargs={"namespace": "private"}

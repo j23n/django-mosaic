@@ -33,6 +33,7 @@ dependencies = [
     "django-markdownify>=0.9.6",
     "django-reversion>=5.1.0",
     "markdown>=3.6",
+    "martor>=1.8.2",
     "pillow>=12.1.0",
     "pygments>=2.19.2",
     "python-dateutil>=2.9.0",

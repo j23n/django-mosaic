@@ -1,17 +1,20 @@
 import reversion
+from martor.widgets import AdminMartorWidget
 from reversion.admin import VersionAdmin
 from reversion.models import Version
 
 from django.contrib import admin, messages
 from django.db import models
 from django import forms
-from django.urls import reverse
+from django.urls import path, reverse
 from django.utils.html import format_html
 from django_mosaic.models import Post, Tag, ContentImage, Author, RelMeLink
+from django_mosaic.uploads import upload_image
 
 
 class ContentImageInlineAdmin(admin.TabularInline):
     model = ContentImage
+    extra = 0
     readonly_fields = ["thumb", "thumbnail_preview", "copy_markdown_button"]
     fields = [
         "image",
@@ -103,16 +106,22 @@ class PostAdmin(VersionAdmin):
     actions = ["publish_revision"]
 
     formfield_overrides = {
-        models.TextField: {
-            "widget": forms.Textarea(
-                attrs={"rows": "20", "style": "max-height: none; width: 100%"}
-            )
-        },
+        models.TextField: {"widget": AdminMartorWidget},
     }
 
     inlines = [ContentImageInlineAdmin]
 
     change_form_template = "admin/django_mosaic/post/change_form.html"
+
+    def get_urls(self):
+        custom = [
+            path(
+                "upload-image/",
+                self.admin_site.admin_view(upload_image),
+                name="django_mosaic_upload_image",
+            ),
+        ]
+        return custom + super().get_urls()
 
     def get_queryset(self, request):
         return (

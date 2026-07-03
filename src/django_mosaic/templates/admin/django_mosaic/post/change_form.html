@@ -1,6 +1,95 @@
 {% extends "admin/change_form.html" %}
 {% load i18n %}
 
+{% block after_related_objects %}
+{{ block.super }}
+{% if original %}
+<fieldset class="module aligned">
+  <h2>{% translate "Add images" %}</h2>
+  <div id="mosaic-dropzone" style="border: 2px dashed var(--border-color, #ccc); border-radius: 6px; padding: 2.5rem 1rem; text-align: center; cursor: pointer; margin: 1rem;">
+    <strong>{% translate "Drop images here" %}</strong> {% translate "or click to select files" %}
+    <div style="font-size: 0.85em; opacity: 0.7; margin-top: 0.4rem;">
+      {% translate "Images upload immediately — no need to press Save. Edit captions and alt text in the list above afterwards." %}
+    </div>
+    <input type="file" id="mosaic-dropzone-input" accept="image/*" multiple hidden>
+    <ul id="mosaic-dropzone-status" style="list-style: none; margin: 0.6rem 0 0; padding: 0; text-align: left;"></ul>
+  </div>
+</fieldset>
+<script>
+(function () {
+    var zone = document.getElementById('mosaic-dropzone');
+    var input = document.getElementById('mosaic-dropzone-input');
+    var status = document.getElementById('mosaic-dropzone-status');
+    var uploadUrl = "{% url 'admin:django_mosaic_upload_image' %}";
+    var postId = "{{ original.pk }}";
+    var pending = 0;
+
+    function csrfToken() {
+        var el = document.querySelector('input[name=csrfmiddlewaretoken]');
+        return el ? el.value : '';
+    }
+
+    function note(text, ok) {
+        var li = document.createElement('li');
+        li.textContent = (ok ? '✓ ' : '✗ ') + text;
+        li.style.color = ok ? 'green' : '#ba2121';
+        status.appendChild(li);
+    }
+
+    function uploadFile(file) {
+        pending++;
+        var data = new FormData();
+        data.append('image', file);
+        data.append('post_id', postId);
+        fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken()
+            },
+            body: data
+        }).then(function (resp) { return resp.json(); }).then(function (json) {
+            if (json.status === 200) {
+                note(file.name, true);
+            } else {
+                note(file.name + ' — ' + (json.error || 'upload failed'), false);
+            }
+        }).catch(function () {
+            note(file.name + ' — network error', false);
+        }).finally(function () {
+            pending--;
+            if (pending === 0) {
+                // Refresh so the inline list above shows the new images.
+                setTimeout(function () { window.location.reload(); }, 600);
+            }
+        });
+    }
+
+    function handleFiles(files) {
+        Array.prototype.forEach.call(files, function (f) {
+            if (f.type.indexOf('image/') === 0) uploadFile(f);
+        });
+    }
+
+    zone.addEventListener('click', function () { input.click(); });
+    input.addEventListener('change', function () { handleFiles(input.files); });
+    zone.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        zone.style.borderColor = '#417690';
+    });
+    zone.addEventListener('dragleave', function () {
+        zone.style.borderColor = '';
+    });
+    zone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        zone.style.borderColor = '';
+        handleFiles(e.dataTransfer.files);
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}
+
 {% block submit_buttons_bottom %}
 {{ block.super }}
 <script>

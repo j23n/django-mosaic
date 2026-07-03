@@ -20,9 +20,27 @@ INSTALLED_APPS = [
     "django.contrib.sitemaps",
     "markdownify.apps.MarkdownifyConfig",
     "reversion",
+    "martor",
     "django_magic_authorization",
     "django_mosaic",
 ]
+
+# Martor markdown editor (admin)
+MARTOR_THEME = "bootstrap"
+MARTOR_UPLOAD_URL = "/admin/django_mosaic/post/upload-image/"
+MARTOR_MARKDOWN_EXTENSIONS = [
+    "markdown.extensions.extra",
+    "markdown.extensions.codehilite",
+]
+MARTOR_ENABLE_CONFIGS = {
+    "emoji": "false",
+    "imgur": "true",  # enables the image-upload toolbar button
+    "mention": "false",
+    "jquery": "true",
+    "living": "false",
+    "spellcheck": "false",
+    "hljs": "true",
+}
 
 DATABASES = {
     "default": {
@@ -32,6 +50,10 @@ DATABASES = {
 }
 
 USE_TZ = True
+
+# Keep test uploads out of the repo working tree.
+MEDIA_ROOT = BASE_DIR / ".test-media"
+MEDIA_URL = "/media/"
 
 CONSTANTS = {
     "site": {
