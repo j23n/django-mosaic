@@ -1,11 +1,14 @@
 """Minimal XRPC client for a single-account, app-password ATProto session.
 
 Deliberately tiny: mosaic only needs identity resolution, record CRUD, and
-blob upload against the *owner's* PDS. Reads of other repos (lexicon pages)
-also go through ``xrpc_get`` since those endpoints are unauthenticated.
+blob upload against the *owner's* PDS. Reads of other repos (lexicon pages,
+preview mode) also go through ``xrpc_get`` since those endpoints are
+unauthenticated.
 """
 
+import ipaddress
 import logging
+from urllib.parse import urlsplit
 
 import requests
 
@@ -18,14 +21,40 @@ class AtprotoError(Exception):
     """Raised when an XRPC call fails."""
 
 
+def _validate_pds_url(url):
+    """Reject PDS endpoints that could be used for SSRF.
+
+    DID documents are attacker-controlled input once we resolve arbitrary
+    handles (preview mode): a malicious document could point the "PDS" at an
+    internal service. Require https on a public hostname. Owner-configured
+    PDS_URL overrides are trusted settings and bypass this (so a same-box
+    http://localhost PDS still works for self-hosters).
+    """
+    parts = urlsplit(url)
+    if parts.scheme != "https":
+        raise AtprotoError(f"Refusing non-https PDS endpoint: {url}")
+    host = parts.hostname or ""
+    if not host or host == "localhost" or host.endswith((".local", ".internal")):
+        raise AtprotoError(f"Refusing PDS endpoint host: {url}")
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass  # a hostname, not an IP literal — fine
+    else:
+        raise AtprotoError(f"Refusing IP-literal PDS endpoint: {url}")
+    return url
+
+
 def resolve_identity(handle):
     """Resolve a handle to (did, pds_url) via public directories.
 
-    Uses the configured DID/PDS_URL overrides when present so air-gapped or
-    self-hosted setups can skip network resolution entirely.
+    The configured DID/PDS_URL overrides apply only when resolving the site
+    owner's own handle (so air-gapped or self-hosted setups skip network
+    resolution) — never when resolving someone else's handle in preview mode.
     """
-    did = conf.get_setting("DID")
-    pds_url = conf.get_setting("PDS_URL")
+    is_owner = handle == conf.get_setting("HANDLE")
+    did = conf.get_setting("DID") if is_owner else ""
+    pds_url = conf.get_setting("PDS_URL") if is_owner else ""
     if did and pds_url:
         return did, pds_url.rstrip("/")
 
@@ -61,7 +90,7 @@ def resolve_identity(handle):
         )
         if not pds:
             raise AtprotoError(f"No PDS endpoint in DID document for {did}")
-        pds_url = pds
+        pds_url = _validate_pds_url(pds)
 
     return did, pds_url.rstrip("/")
 

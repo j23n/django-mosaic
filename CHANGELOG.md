@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Read-only preview mode (`MOSAIC_ATPROTO["PREVIEW"]`): `/@<handle>` renders
+  any account's public ATmosphere content — profile header plus sections for
+  every known collection present in their repo, other collections listed by
+  name.
+- glightbox is vendored (3.3.1, MIT) instead of loaded from the jsdelivr CDN.
+
+### Changed
+- All ATProto read paths (lexicon pages, blob URLs, record partials) now take
+  an explicit identity instead of reading a settings singleton, with
+  per-identity caches — groundwork for multi-tenant hosting. Owner DID/PDS
+  overrides no longer apply when resolving other handles, and PDS endpoints
+  discovered from DID documents are validated (https, no IP literals or
+  internal hosts) against SSRF.
+
 ## [0.2.0] - 2026-07-03
 
 ### Added

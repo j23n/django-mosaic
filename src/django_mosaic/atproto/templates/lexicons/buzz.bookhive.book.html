@@ -7,7 +7,7 @@ restyle the books page entries.
 {% load mosaic_atproto %}
 <article class="bookhive-book">
   {% if record.value.cover %}
-  <img class="bookhive-cover" src="{{ record.value.cover|blob_url }}" alt="Cover of {{ record.value.title }}" loading="lazy" style="max-height: 120px; float: left; margin-right: 1em;">
+  <img class="bookhive-cover" src="{{ record.value.cover|blob_url:identity }}" alt="Cover of {{ record.value.title }}" loading="lazy" style="max-height: 120px; float: left; margin-right: 1em;">
   {% endif %}
   <strong>{{ record.value.title }}</strong>
   {% if record.value.authors %}<span class="muted"> by {{ record.value.authors|tabbed }}</span>{% endif %}

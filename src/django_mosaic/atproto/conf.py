@@ -62,6 +62,10 @@ DEFAULTS = {
     # Skip the inline content block above this size (bytes) to avoid 413s
     # against the PDS record-size limit; textContent still carries the post.
     "CONTENT_MAX_INLINE_BYTES": 30_000,
+    # Opt-in read-only preview mode: /@<handle> renders any account's public
+    # ATmosphere content. Public data only; consider rate limiting at the
+    # proxy if you enable this on an internet-facing instance.
+    "PREVIEW": False,
 }
 
 DOCUMENT_NSID = "site.standard.document"

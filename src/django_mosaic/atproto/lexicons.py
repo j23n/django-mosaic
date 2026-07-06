@@ -1,6 +1,6 @@
-"""Read arbitrary lexicon collections from the owner's repo and render them.
+"""Read arbitrary lexicon collections from a repo and render them.
 
-This is the "personal AppView" half of the bridge: any collection in your PDS
+This is the "personal AppView" half of the bridge: any collection in a PDS
 repo (Tangled repos, BookHive books, ...) can be listed on the site with two
 XRPC reads and a template. No models, no migrations — records are rendered
 straight from their JSON via a template-per-NSID registry:
@@ -11,6 +11,10 @@ straight from their JSON via a template-per-NSID registry:
 Pages are configured in MOSAIC_ATPROTO["LEXICON_PAGES"]; consumers customize
 a page by overriding its partial (or `lexicon-page.html`) in their project's
 template directory — the same override mechanism as the rest of mosaic.
+
+All read functions accept an explicit ``identity`` (see identity.py) and
+default to the site owner's, so the same code paths serve the owner's site
+and read-only previews of any handle.
 """
 
 import logging
@@ -18,17 +22,34 @@ import logging
 from django.core.cache import cache
 
 from . import conf
-from .client import resolve_identity, xrpc_get
+from . import identity as identity_mod
+from .client import xrpc_get
 
 logger = logging.getLogger("django_mosaic.atproto")
 
 LIST_CACHE_SECONDS = 300
-IDENTITY_CACHE_SECONDS = 3600
+DESCRIBE_CACHE_SECONDS = 600
 MAX_RECORDS = 500
 
 DEFAULT_PAGES = {
     "projects": {"collection": "sh.tangled.repo", "title": "Projects"},
     "books": {"collection": "buzz.bookhive.book", "title": "Books"},
+}
+
+# Collections the preview page knows how to present as sections, in display
+# order. Anything else in a repo renders via the generic partial or is listed
+# by name only.
+PREVIEW_COLLECTIONS = {
+    "site.standard.document": "Writing",
+    "com.whtwnd.blog.entry": "Writing",
+    "sh.tangled.repo": "Projects",
+    "buzz.bookhive.book": "Books",
+    "social.grain.gallery": "Photos",
+    "fm.teal.alpha.feed.play": "Listening",
+    "app.rocksky.scrobble": "Listening",
+    "community.lexicon.calendar.event": "Events",
+    "my.skylights.rel": "Reviews",
+    "blue.linkat.board": "Links",
 }
 
 
@@ -46,35 +67,70 @@ def read_enabled():
     )
 
 
-def identity():
-    """(did, pds_url) for the site owner, cached."""
-    cache_key = "mosaic_atproto:identity"
+def _target(identity):
+    """The Identity to read from (explicit one, else the site owner's).
+
+    Returns None when unavailable — including when owner resolution fails —
+    so render paths degrade instead of raising.
+    """
+    if identity is not None:
+        return identity
+    try:
+        return identity_mod.owner()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"owner identity resolution failed: {e}")
+        return None
+
+
+def owner_identity():
+    """The site owner's Identity, or None when unconfigured/unresolvable."""
+    return _target(None)
+
+
+def describe_repo(identity=None):
+    """Collection NSIDs present in a repo, cached. Empty list on failure."""
+    target = _target(identity)
+    if target is None:
+        return []
+    cache_key = f"mosaic_atproto:collections:{target.did}"
     cached = cache.get(cache_key)
-    if cached:
+    if cached is not None:
         return cached
-    resolved = resolve_identity(conf.get_setting("HANDLE"))
-    cache.set(cache_key, resolved, IDENTITY_CACHE_SECONDS)
-    return resolved
+    try:
+        data = xrpc_get(
+            target.pds_url,
+            "com.atproto.repo.describeRepo",
+            {"repo": target.did},
+        )
+        collections = list(data.get("collections", []))
+    except Exception as e:  # noqa: BLE001 - a PDS outage must not 500 the site
+        logger.warning(f"describeRepo failed for {target.did}: {e}")
+        return []
+    cache.set(cache_key, collections, DESCRIBE_CACHE_SECONDS)
+    return collections
 
 
-def list_records(collection, limit=MAX_RECORDS):
-    """All records of one collection from the owner's repo, newest first.
+def list_records(collection, identity=None, limit=MAX_RECORDS):
+    """Records of one collection from a repo, newest first.
 
     Returns a list of {"uri", "cid", "rkey", "value"} dicts (rkeys are TIDs,
-    so reverse listing is reverse-chronological). Cached; empty on failure.
+    so reverse listing is reverse-chronological). Cached per identity;
+    empty on failure.
     """
-    cache_key = f"mosaic_atproto:records:{collection}"
+    target = _target(identity)
+    if target is None:
+        return []
+    cache_key = f"mosaic_atproto:records:{target.did}:{collection}:{limit}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
     records = []
     try:
-        did, pds_url = identity()
         cursor = None
         while len(records) < limit:
             params = {
-                "repo": did,
+                "repo": target.did,
                 "collection": collection,
                 "limit": min(100, limit - len(records)),
                 # rkeys are TIDs (ascending in time); reverse => newest first
@@ -82,7 +138,7 @@ def list_records(collection, limit=MAX_RECORDS):
             }
             if cursor:
                 params["cursor"] = cursor
-            data = xrpc_get(pds_url, "com.atproto.repo.listRecords", params)
+            data = xrpc_get(target.pds_url, "com.atproto.repo.listRecords", params)
             for item in data.get("records", []):
                 records.append(
                     {
@@ -103,17 +159,15 @@ def list_records(collection, limit=MAX_RECORDS):
     return records
 
 
-def blob_url(blob):
-    """Public URL for a blob dict from one of the owner's records."""
+def blob_url(blob, identity=None):
+    """Public URL for a blob dict from one of the target repo's records."""
     if not isinstance(blob, dict):
         return ""
     ref = blob.get("ref")
     cid = ref.get("$link") if isinstance(ref, dict) else ref
     if not cid:
         return ""
-    try:
-        did, pds_url = identity()
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"identity resolution failed for blob URL: {e}")
+    target = _target(identity)
+    if target is None:
         return ""
-    return f"{pds_url}/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
+    return f"{target.pds_url}/xrpc/com.atproto.sync.getBlob?did={target.did}&cid={cid}"

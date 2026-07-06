@@ -305,6 +305,7 @@ Defaults are taken from `conf.py` (`DEFAULTS`) and the lexicon/reaction modules.
 | `CONTENT_NSID` | `"blog.mosaic.content.markdown"` | `$type` of the mosaic-native markdown block embedded in the document's open `content` union. Override with your own domain-based NSID if you publish a lexicon for it. |
 | `CONTENT_MAX_INLINE_BYTES` | `30000` | Skip the inline content block above this size to avoid 413s against the PDS record limit; `textContent` still carries the post. |
 | `LEXICON_PAGES` | `{"projects": {...sh.tangled.repo...}, "books": {...buzz.bookhive.book...}}` | Root-level pages rendering repo collections (`{slug: {collection, title}}`). Setting it replaces the defaults. |
+| `PREVIEW` | `False` | Opt-in read-only preview: `/@<handle>` renders any account's public ATmosphere content (profile header + sections for known collections). Public data only; rate-limit at the proxy on internet-facing instances. |
 | `APPVIEW_URL` | `"https://public.api.bsky.app"` | Override the Bluesky AppView used for `getPostThread`. Rarely needed. |
 | `CONSTELLATION_URL` | `"https://constellation.microcosm.blue"` | Override the Constellation backlink index. Rarely needed (e.g. self-hosted). |
 

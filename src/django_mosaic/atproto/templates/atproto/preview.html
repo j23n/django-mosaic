@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% comment %}
+Read-only preview of any handle's ATmosphere content (/@handle). Override in
+your project to restyle. Context: identity, profile (may be None), sections
+(each: title, collection, records, record_template), other_collections.
+{% endcomment %}
+
+{% block title %} - @{{ identity.handle }}{% endblock %}
+{% block meta_description %}The ATmosphere home of @{{ identity.handle }}{% endblock %}
+
+{% block content %}
+<header class="atproto-preview-header h-card">
+  {% if profile.avatar %}
+  <img class="u-photo atproto-preview-avatar" src="{{ profile.avatar }}" alt="" width="72" height="72" style="border-radius: 50%; float: left; margin-right: 1em;">
+  {% endif %}
+  <hgroup>
+    <h1 class="p-name">{% if profile %}{{ profile.display_name }}{% else %}@{{ identity.handle }}{% endif %}</h1>
+    <p class="muted">
+      <a class="u-url muted" href="https://bsky.app/profile/{{ identity.handle }}">@{{ identity.handle }}</a>
+      · <code class="muted" style="font-size: 0.8em;">{{ identity.did }}</code>
+    </p>
+    {% if profile.description %}<p class="p-note">{{ profile.description }}</p>{% endif %}
+  </hgroup>
+  <div style="clear: both;"></div>
+</header>
+
+{% for section in sections %}
+<section class="atproto-preview-section">
+  <h2>{{ section.title }}</h2>
+  <ul class="lexicon-records list-plain">
+    {% for record in section.records %}
+    <li class="lexicon-record">{% include section.record_template %}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% empty %}
+<p class="muted">No previewable collections found in this repo.</p>
+{% endfor %}
+
+{% if other_collections %}
+<section class="atproto-preview-other">
+  <h2>Also in this repo</h2>
+  <p class="muted">
+    {% for collection in other_collections %}<code>{{ collection }}</code>{% if not forloop.last %} · {% endif %}{% endfor %}
+  </p>
+</section>
+{% endif %}
+
+<p class="muted"><small>
+  A read-only view of public ATmosphere data, rendered by
+  <a class="muted" href="https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD">Mosaic</a>.
+</small></p>
+{% endblock %}

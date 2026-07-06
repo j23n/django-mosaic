@@ -20,9 +20,13 @@ def atproto_handle():
 
 
 @register.filter
-def blob_url(blob):
-    """URL for a blob dict from one of the owner's records (images etc.)."""
-    return lexicons.blob_url(blob)
+def blob_url(blob, identity=None):
+    """URL for a blob dict from a repo's records (images etc.).
+
+    Pass the context identity for preview pages ({{ blob|blob_url:identity }});
+    falls back to the site owner when the argument is absent/empty.
+    """
+    return lexicons.blob_url(blob, identity=identity or None)
 
 
 @register.filter

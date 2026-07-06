@@ -11,9 +11,16 @@ Include at the project root so the well-known paths land on the domain root::
 from django.urls import path
 
 from . import lexicons
-from .views import lexicon_page, wellknown_atproto_did, wellknown_publication
+from .views import (
+    lexicon_page,
+    preview,
+    wellknown_atproto_did,
+    wellknown_publication,
+)
 
 urlpatterns = [
+    # Read-only preview of any handle (opt-in via MOSAIC_ATPROTO["PREVIEW"]).
+    path("@<str:handle>", preview, name="atproto-preview"),
     path(
         ".well-known/atproto-did",
         wellknown_atproto_did,
