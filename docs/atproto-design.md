@@ -37,6 +37,68 @@ What changes when aggregation is the identity rather than a feature:
   server rendering, a real private layer, deployment automation, IndieWeb
   dual citizenship.
 
+### Competitive landscape (researched 2026-07)
+
+The niche is genuinely open. What exists:
+
+- **blento** (blento.app, ~200 stars, active, hosted + custom domains) — the
+  momentum leader for "PDS-backed personal homepage", but it's a bento/
+  link-in-bio profile of *cards*, not whole-repo content aggregation. Rose
+  from bento.me's shutdown. Main threat vector: cards → content feeds.
+- **at-home** (tynanpurdy, Astro) — the closest architectural match (generic
+  lexicon→component renderer, Jetstream), but pre-alpha: 3 stars, dormant,
+  developer-only, no theming system.
+- **dame.is** — the best existence proof: a hand-rolled personal AppView over
+  custom lexicons (status, pages, portfolio, resume). 1,155 commits, 10
+  stars, purpose-built — everyone who wants this today hand-rolls it.
+- Blog-slice tools (Leaflet/pckt/WhiteWind+WhiteBreeze, standard.site
+  loaders, Sequoia, Automattic's wordpress-atmosphere) — publish/render
+  *blogs* only; the blog slice is commoditized.
+- Linkat (links only), record explorers (PDSls/atproto.at — dev tools), and
+  infra enablers (Slices hosted AppViews, contrail, cirrus) — adjacent, not
+  competing.
+
+Unoccupied as of Jul 2026: productized multi-lexicon aggregation for one
+DID; self-hosted server-rendered deploy-in-one-command; domain-as-handle
+bundled as a product feature; site-wide inbound interactions; private/gated
+sections. Mosaic's wedge is exactly that list.
+
+### Productization: anyone builds their own home
+
+Three phases, each shippable:
+
+- **A. Make it feel like the product (single-user OSS).**
+  - *Handle-only onboarding*: reading is unauthenticated, so setup needs only
+    a handle. `mosaic-admin init` resolves the DID, runs `describeRepo`,
+    detects which collections actually exist, and proposes the site sections
+    — "your site exists in five minutes". The app password becomes optional,
+    needed only to enable publishing.
+  - Unified timeline home; theme packs (CSS variables + template-registry
+    overrides); more shipped lexicon partials (Grain, teal/Rocksky,
+    Smoke Signal, Linkat).
+  - Config moves from settings-dict to DB-backed, admin-editable settings so
+    users never touch Python.
+- **B. Anyone can run it.**
+  - Published Docker image + compose file; templates for PikaPods / Coolify /
+    CapRover-class one-click hosts; keep the VPS deployment tool for the
+    DIY crowd. Docs site.
+  - *Instant preview mode*: since all repo data is public, mosaic can render
+    ANY handle read-only. A demo instance ("type a handle, see their home")
+    is both the zero-friction demo and the growth loop.
+- **C. Hosted (the product for everyone else).**
+  - Multi-tenant deployment of the same OSS engine: sign in with ATProto
+    (OAuth) → your site exists immediately at handle.<host> → theme it →
+    bring a custom domain, with domain-as-handle offered as a bundled
+    feature (nobody does this). Freemium: subdomain free, custom domain
+    paid. The engine stays the OSS Django package — self-hostability is the
+    moat against blento/Leaflet expanding into this space.
+
+**Private posts: deferred.** The existing off-protocol Django private
+namespace stays (it works, costs nothing, and remains a differentiator), but
+the encryption layer and PDS ciphertext mirror wait until permissioned data
+(proposal 0016) ships upstream — then the private namespace becomes a space
+viewer. No rolled crypto in the meantime.
+
 ### Private content under the new positioning
 
 Authoring stays in-house (martor) because of the private namespace — and the
