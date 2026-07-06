@@ -1,6 +1,16 @@
 # Mosaic
 
-A simple blog system in the spirit of the <a href="https://indieweb.org">IndieWeb</a>. It's aimed to get up and running as quickly as possible with your own, easily customizable CMS
+A self-hosted blog in the spirit of the <a href="https://indieweb.org">IndieWeb</a> that grows into a **personal AppView of your [AT Protocol](https://atproto.com) repository** — your posts, photos, repos, books, and other ATmosphere content, rendered as one site you control. Get up and running fast with your own, easily customizable CMS.
+
+### Three ways to run it
+
+Each shape is a superset of the previous one. You opt in by adding an app to `INSTALLED_APPS`; nothing turns on until you configure it.
+
+1. **Blog** (`django_mosaic`) — a self-hosted markdown blog: admin editor, public/private namespaces, RSS, sitemaps. No network dependencies. *Start here.*
+2. **Aggregator** (`+ django_mosaic.atproto`) — publish posts to your PDS, render your other lexicon collections as pages, show ATmosphere reactions, preview any handle, sign in with ATProto. See [`docs/atproto-setup.md`](docs/atproto-setup.md).
+3. **Hosted** (`+ django_mosaic.hosted`) — one deployment serves many people's sites, each claimed and themed from their own PDS. See [`docs/hosted-setup.md`](docs/hosted-setup.md).
+
+New to the codebase? Read [`docs/architecture.md`](docs/architecture.md) for the map.
 
 ## Installation
 
@@ -110,6 +120,21 @@ Customize collection pages (e.g. `/projects`) by overriding
 `lexicons/<collection NSID>.html` — the same template-override mechanism as
 the rest of mosaic. Drafts and the private namespace never leave your server.
 
+A few optional pieces build on the bridge, each behind an extra:
+
+- **Preview mode** (`MOSAIC_ATPROTO["PREVIEW"]`) renders *any* handle's public
+  ATmosphere content at `/@<handle>` — a demo of the aggregator, and the seed
+  of the hosted service's "type a handle, see your home" landing page.
+- **Sign in with ATProto** (`pip install django-mosaic[oauth]`) is a full
+  OAuth client so visitors authenticate with their own account — the basis for
+  claiming a hosted site.
+- **Live cache invalidation** (`pip install django-mosaic[jetstream]`,
+  `manage.py atproto jetstream`) keeps pages fresh seconds after you publish
+  anywhere in the ATmosphere, instead of at cache TTL.
+
+See [`docs/atproto-setup.md`](docs/atproto-setup.md) for the full settings
+reference and setup walkthrough.
+
 ## Deployment
 
 To reduce one of the major pains of running your own site, Mosaic includes automated deployment for VPS hosting with sane (reach out if not!) defaults for Docker, nginx, and SSL certificates.
@@ -147,6 +172,20 @@ Shows health checks for services, SSL certificates, backups, and application ava
 
 Configuration is saved to `.deployment-config.toml` for subsequent runs.
 
+
+## Documentation
+
+- [`docs/architecture.md`](docs/architecture.md) — how the three layers fit
+  together, the data model, request lifecycles, caching, and the security model.
+- [`docs/atproto-setup.md`](docs/atproto-setup.md) — enabling the ATProto
+  bridge: publishing, lexicon pages, reactions, preview mode, OAuth sign-in,
+  and the full `MOSAIC_ATPROTO` reference.
+- [`docs/hosted-setup.md`](docs/hosted-setup.md) — running the multi-tenant
+  hosted service: routing, claiming, the dashboard, custom domains, and
+  moderation.
+- [`docs/atproto-design.md`](docs/atproto-design.md) /
+  [`docs/hosted-plan.md`](docs/hosted-plan.md) — the design notes and product
+  plan behind the ATProto and hosted directions.
 
 ## 🤖 AI Disclaimer
 
