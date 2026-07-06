@@ -102,6 +102,25 @@ class ThemeValidationTest(TestCase):
     def test_empty_settings_produce_no_css(self):
         self.assertEqual(site_settings.css_variables(None), "")
 
+    def test_hostile_record_shapes_do_not_crash(self):
+        # A tenant's own repo can hold any shape; the render helpers must
+        # degrade to defaults instead of raising (which would 500 their site).
+        for hostile in (
+            {"sections": "not-a-list", "theme": "not-a-dict"},
+            {"sections": [1, "x", None], "theme": {"tokens": "nope"}},
+            "the-whole-record-is-a-string",
+            [1, 2, 3],
+            {"theme": {"preset": ["list"], "tokens": ["list"]}},
+        ):
+            self.assertIsInstance(site_settings.css_variables(hostile), str)
+            self.assertIsInstance(site_settings.custom_css(hostile), str)
+            with mock.patch(
+                "django_mosaic.atproto.lexicons.describe_repo", return_value=[]
+            ):
+                self.assertIsInstance(
+                    site_settings.effective_sections(ALICE, hostile), list
+                )
+
 
 class SettingsRecordTest(TestCase):
     def setUp(self):
@@ -198,7 +217,9 @@ class DashboardViewTest(TestCase):
     def test_get_renders_current_settings(self):
         self._with_tenant()
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch("django_mosaic.hosted.site_settings.load", return_value=STORED),
             mock.patch(
                 "django_mosaic.atproto.lexicons.describe_repo",
@@ -213,7 +234,9 @@ class DashboardViewTest(TestCase):
     def test_post_saves_to_pds_and_redirects(self):
         self._with_tenant()
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch("django_mosaic.hosted.site_settings.load", return_value=None),
             mock.patch("django_mosaic.hosted.site_settings.save") as save,
         ):
@@ -249,7 +272,9 @@ class DashboardViewTest(TestCase):
     def test_post_save_failure_shows_error(self):
         self._with_tenant()
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch("django_mosaic.hosted.site_settings.load", return_value=None),
             mock.patch(
                 "django_mosaic.hosted.site_settings.save",
@@ -293,7 +318,9 @@ class TenantHomeSettingsTest(TestCase):
             },
         ]
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch(
                 "django_mosaic.atproto.preview.fetch_profile", return_value=None
             ),

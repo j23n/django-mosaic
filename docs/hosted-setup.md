@@ -14,12 +14,16 @@ INSTALLED_APPS += ["django_mosaic.hosted"]
 
 MIDDLEWARE += ["django_mosaic.hosted.middleware.TenantMiddleware"]
 
-ALLOWED_HOSTS = ["mosaic.example", ".mosaic.example"]  # note the leading dot
+# Subdomains need the leading dot. Custom domains (below) additionally
+# require accepting arbitrary hosts — safe ONLY when the app is reachable
+# exclusively through your TLS proxy. See "Custom domains" for the tradeoff.
+ALLOWED_HOSTS = ["mosaic.example", ".mosaic.example"]  # + "*" if using custom domains
 
 MOSAIC_HOSTED = {
     "BASE_DOMAIN": "mosaic.example",
     # "RESERVED_SUBDOMAINS": ["extra", "names"],  # merged with built-ins
     # "CLAIM_OPEN": True,  # set False to freeze signups, keep sites served
+    # "DOMAIN_TARGET": "mosaic.example",  # what custom-domain CNAMEs point at
 }
 ```
 
@@ -88,10 +92,11 @@ configuration included. Reads are public XRPC, cached ~5 minutes.
 ## Custom domains
 
 Tenants connect their own domain from the dashboard. There is no explicit
-verification step — control is proven by serving:
+verification token; ownership is established operationally:
 
 1. The tenant enters `blog.example.com` on `/dashboard` (validated: real
-   hostname, not under the base domain, not registered to another tenant).
+   hostname, not under the base domain, not already *verified* by another
+   tenant — see the squatting note below).
 2. They point DNS at your server: a CNAME to `DOMAIN_TARGET` (defaults to
    the base domain), or ALIAS/ANAME at an apex.
 3. TLS is issued on demand. Configure your proxy to ask us first — with
@@ -115,13 +120,34 @@ verification step — control is proven by serving:
    `/domains/check?domain=<host>` answers 200 only for domains an active
    tenant has registered, so certificates are never requested for hosts we
    won't serve. Issuance itself can only succeed if the DNS actually points
-   at us (ACME), which is the real ownership proof.
+   at us (ACME), which is the operational ownership proof.
 4. The first request arriving with that Host marks the domain verified
    (`domain_verified_at`); the dashboard flips from "waiting for DNS" to
    connected.
 
-A squatted domain string (registered here but never pointed at us) never
-verifies and can be cleared in the admin.
+**Security model — read this before deploying.** The verification guarantee
+rests entirely on your ingress. The application marks a domain verified from
+the `Host` header alone; it does **not** inspect the TLS certificate. That is
+safe only if the app process is reachable *exclusively* through your
+TLS-terminating proxy (Caddy/nginx) — bind it to `127.0.0.1`, never expose the
+app port directly. If any path lets a client reach the app with an arbitrary
+`Host`, they can stamp a registered domain as verified. Two required settings
+follow from this:
+
+- `ALLOWED_HOSTS` must accept custom-domain hosts. Django rejects unknown
+  hosts with `DisallowedHost` *before* the middleware runs, so custom domains
+  simply won't work unless you widen it. Because you can't enumerate tenant
+  domains in settings, use a host validator or set `ALLOWED_HOSTS = ["*"]`
+  **and rely on the proxy** to only forward hosts it holds a cert for. Do not
+  use `["*"]` with a directly-exposed app port.
+- Keep the on-demand `ask` endpoint pointed only at active tenants (it already
+  filters on status) so a suspended tenant's domain stops getting certs.
+
+Squatting is bounded: registering a domain string you don't control creates
+only an *unverified* claim, which the real owner can reclaim by registering it
+themselves (whoever's DNS actually points here verifies first and locks it). A
+*verified* domain is locked to its tenant. Stale unverified claims can also be
+cleared in the admin.
 
 ### Domain-as-handle
 
@@ -158,13 +184,19 @@ as `--mosaic-*` custom properties.
 ## Reports and moderation
 
 `/report?site=<subdomain or custom domain>` on the base domain files an
-abuse report (anonymous, optional contact, honeypot-filtered, per-IP
-throttled). Reports appear in the admin with resolve and
+abuse report (anonymous, optional contact, honeypot-filtered, throttled per
+`(IP, reported-site)`). Reports appear in the admin with resolve and
 suspend-the-reported-tenant actions; tenant pages link the form in their
 footer. Suspension takes effect on the next request — the middleware
 checks status on every hit — and also drops the domain from the on-demand
 TLS ask endpoint. Pair this with actual ToS/legal pages for your
 deployment.
+
+The throttle keys on `REMOTE_ADDR`, so — exactly like `PREVIEW_RATE_LIMIT` —
+configure real-IP forwarding at your proxy (e.g. nginx `real_ip`) or every
+visitor shares one bucket. The key also includes the reported site, so even a
+collapsed IP can only rate-limit reports against a single tenant, never
+globally.
 
 ## Data freshness
 

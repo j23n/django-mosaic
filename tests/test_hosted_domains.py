@@ -170,13 +170,17 @@ class DashboardDomainTest(TestCase):
         tenant.refresh_from_db()
         self.assertIsNone(tenant.custom_domain)
 
-    def test_invalid_base_and_taken_domains_rejected(self):
+    def test_invalid_and_verified_taken_domains_rejected(self):
+        from django.utils import timezone
+
         tenant = self._tenant_signed_in()
+        # A domain another tenant has *verified* is locked and cannot be taken.
         _tenant(
             did="did:plc:other",
             handle="other.example",
             subdomain="other",
             custom_domain="taken.blog",
+            domain_verified_at=timezone.now(),
         )
         for bad in (
             "not a domain",
@@ -188,6 +192,23 @@ class DashboardDomainTest(TestCase):
             self.assertEqual(resp.status_code, 302, bad)
             tenant.refresh_from_db()
             self.assertIsNone(tenant.custom_domain, bad)
+
+    def test_unverified_domain_can_be_reclaimed(self):
+        # A squatter registering a string they don't control (unverified) must
+        # not permanently block the real owner from connecting it.
+        squatter = _tenant(
+            did="did:plc:squatter",
+            handle="squatter.example",
+            subdomain="squatter",
+            custom_domain="contested.blog",
+        )
+        tenant = self._tenant_signed_in()
+        resp = self.client.post("/dashboard/domain", {"domain": "contested.blog"})
+        self.assertEqual(resp.status_code, 302)
+        tenant.refresh_from_db()
+        squatter.refresh_from_db()
+        self.assertEqual(tenant.custom_domain, "contested.blog")
+        self.assertIsNone(squatter.custom_domain)  # reclaimed
 
     def test_anonymous_redirected(self):
         resp = self.client.post("/dashboard/domain", {"domain": "a.blog"})

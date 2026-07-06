@@ -160,7 +160,9 @@ class TenantHomeTest(TestCase):
             }
         ]
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch(
                 "django_mosaic.atproto.preview.fetch_profile", return_value=profile
             ),
@@ -186,7 +188,7 @@ class TenantHomeTest(TestCase):
 
         _tenant()
         with mock.patch(
-            "django_mosaic.atproto.identity.resolve",
+            "django_mosaic.atproto.identity.resolve_did",
             side_effect=AtprotoError("resolution failed"),
         ):
             resp = self.client.get("/", HTTP_HOST="alice.mosaic.example")
@@ -195,6 +197,28 @@ class TenantHomeTest(TestCase):
     def test_unknown_subdomain_404s(self):
         resp = self.client.get("/", HTTP_HOST="ghost.mosaic.example")
         self.assertEqual(resp.status_code, 404)
+
+    def test_renders_from_stored_did_not_current_handle(self):
+        # Handle-takeover guard: the site is resolved from the immutable DID
+        # proven at claim, so a later takeover of the handle can't hijack it.
+        _tenant()  # did:plc:alice, handle alice.example
+        with (
+            mock.patch("django_mosaic.atproto.identity.resolve_did") as resolve_did,
+            mock.patch("django_mosaic.atproto.identity.resolve") as resolve_handle,
+            mock.patch(
+                "django_mosaic.atproto.preview.fetch_profile", return_value=None
+            ),
+            mock.patch(
+                "django_mosaic.atproto.preview.build_sections", return_value=([], [])
+            ),
+            mock.patch("django_mosaic.hosted.site_settings.load", return_value=None),
+            mock.patch("django_mosaic.atproto.lexicons.describe_repo", return_value=[]),
+        ):
+            resolve_did.return_value = ALICE
+            self.client.get("/", HTTP_HOST="alice.mosaic.example")
+        # Resolution was by DID, never by the mutable handle.
+        resolve_did.assert_called_once_with("did:plc:alice", handle="alice.example")
+        resolve_handle.assert_not_called()
 
 
 @override_settings(MOSAIC_HOSTED=HOSTED_ON, ALLOWED_HOSTS=["*"], ROOT_URLCONF=__name__)

@@ -20,6 +20,7 @@ from urllib.parse import urlencode
 import jwt
 import requests
 from cryptography.hazmat.primitives import serialization
+from django.db import transaction
 from django.utils import timezone
 
 from .. import client as atclient
@@ -57,13 +58,27 @@ def _get_json(url):
         raise OAuthError(f"GET {url} returned non-JSON") from e
 
 
+def _safe_endpoint(url):
+    """Validate an authorization-server URL against SSRF, like the PDS URL.
+
+    The issuer and every endpoint come from attacker-controllable documents
+    once we resolve arbitrary handles, so they get the same https / no-IP /
+    no-internal-host treatment ``client._validate_pds_url`` applies to a
+    discovered PDS.
+    """
+    try:
+        return atclient._validate_pds_url(url)
+    except atclient.AtprotoError as e:
+        raise OAuthError(str(e)) from e
+
+
 def authorization_server_for(pds_url):
     """The authorization server (issuer URL) protecting a PDS."""
     data = _get_json(f"{pds_url.rstrip('/')}/.well-known/oauth-protected-resource")
     servers = data.get("authorization_servers") or []
     if not servers:
         raise OAuthError(f"No authorization_servers advertised by {pds_url}")
-    return servers[0].rstrip("/")
+    return _safe_endpoint(servers[0]).rstrip("/")
 
 
 def authorization_server_metadata(issuer):
@@ -71,9 +86,15 @@ def authorization_server_metadata(issuer):
     data = _get_json(f"{issuer}/.well-known/oauth-authorization-server")
     if data.get("issuer", "").rstrip("/") != issuer:
         raise OAuthError(f"Issuer mismatch in metadata from {issuer}")
+    # The endpoints are attacker-controlled once the handle is arbitrary; the
+    # client POSTs DPoP proofs and a private_key_jwt assertion to them, so
+    # reject internal/non-https targets before ever calling them.
     for field in ("authorization_endpoint", "token_endpoint"):
         if not data.get(field):
             raise OAuthError(f"Authorization server metadata missing {field}")
+        _safe_endpoint(data[field])
+    if data.get("pushed_authorization_request_endpoint"):
+        _safe_endpoint(data["pushed_authorization_request_endpoint"])
     return data
 
 
@@ -223,8 +244,12 @@ def complete_auth(request):
         raise OAuthError("No pending authorization request in this session.")
     if not secrets.compare_digest(params.get("state", ""), pending["state"]):
         raise OAuthError("State mismatch — possible CSRF, aborting.")
-    # atproto requires the `iss` callback param; reject a swapped issuer.
-    if params.get("iss", pending["issuer"]).rstrip("/") != pending["issuer"]:
+    # atproto requires the `iss` authorization-response param (RFC 9207);
+    # a missing one is a hard failure, not "assume the expected issuer".
+    callback_iss = params.get("iss")
+    if not callback_iss:
+        raise OAuthError("Callback is missing the required `iss` parameter.")
+    if callback_iss.rstrip("/") != pending["issuer"]:
         raise OAuthError("Issuer mismatch in callback.")
     code = params.get("code")
     if not code:
@@ -279,29 +304,56 @@ def _expiry(tokens):
 
 
 def refresh(session):
-    """Refresh the session's access token in place; returns the session."""
+    """Refresh the session's access token in place; returns the session.
+
+    ATProto refresh tokens are single-use/rotating, so concurrent workers
+    must not both spend the same one. We take a row lock and, once we hold
+    it, re-read: if another worker already rotated the token while we waited,
+    we adopt its result instead of burning our now-stale token.
+    """
     if not session.refresh_token:
         raise OAuthError(f"No refresh token stored for {session.did}.")
-    tokens, _ = _post_with_dpop(
-        session.token_endpoint,
-        {
-            "grant_type": "refresh_token",
-            "refresh_token": session.refresh_token,
-            "client_id": metadata.client_id(),
-            "client_assertion_type": (
-                "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
-            ),
-            "client_assertion": _client_assertion(session.auth_server),
-        },
-        session.dpop_jwk,
-    )
-    session.access_token = tokens["access_token"]
-    if tokens.get("refresh_token"):
-        session.refresh_token = tokens["refresh_token"]
-    session.access_token_expires_at = _expiry(tokens)
-    session.save(
-        update_fields=["access_token", "refresh_token", "access_token_expires_at"]
-    )
+
+    stale_token = session.refresh_token
+    with transaction.atomic():
+        locked = OAuthSession.objects.select_for_update().filter(pk=session.pk).first()
+        if locked is None:
+            raise OAuthError(f"Session {session.did} no longer exists.")
+        if locked.refresh_token != stale_token:
+            # Someone refreshed while we waited for the lock — use their tokens.
+            session.access_token = locked.access_token
+            session.refresh_token = locked.refresh_token
+            session.access_token_expires_at = locked.access_token_expires_at
+            return session
+
+        tokens, _ = _post_with_dpop(
+            locked.token_endpoint,
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": locked.refresh_token,
+                "client_id": metadata.client_id(),
+                "client_assertion_type": (
+                    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+                ),
+                "client_assertion": _client_assertion(locked.auth_server),
+            },
+            locked.dpop_jwk,
+        )
+        locked.access_token = tokens["access_token"]
+        if tokens.get("refresh_token"):
+            locked.refresh_token = tokens["refresh_token"]
+        locked.access_token_expires_at = _expiry(tokens)
+        locked.save(
+            update_fields=[
+                "access_token",
+                "refresh_token",
+                "access_token_expires_at",
+            ]
+        )
+
+    session.access_token = locked.access_token
+    session.refresh_token = locked.refresh_token
+    session.access_token_expires_at = locked.access_token_expires_at
     return session
 
 
@@ -338,8 +390,12 @@ def xrpc_call(session, nsid, method="GET", params=None, json_body=None):
 
     url = f"{session.pds_url.rstrip('/')}/xrpc/{nsid}"
     nonce = session.dpop_pds_nonce or None
+    nonce_retried = False
     refreshed = False
-    for _ in range(3):
+    # At most: one nonce retry + one refresh retry + the retry after each, so
+    # four attempts covers every combination without ever exhausting the loop
+    # on a recoverable condition and mis-reporting it as a hard error.
+    for _ in range(4):
         headers = {
             "Authorization": f"DPoP {session.access_token}",
             "DPoP": dpop.proof(
@@ -358,12 +414,16 @@ def xrpc_call(session, nsid, method="GET", params=None, json_body=None):
             headers=headers,
             timeout=conf.get_setting("TIMEOUT"),
         )
-        if _wants_dpop_nonce(resp):
+        # A nonce demand is free to retry and must not consume the refresh
+        # budget; honor it once (a server that keeps demanding is broken).
+        if _wants_dpop_nonce(resp) and not nonce_retried:
             nonce = resp.headers["DPoP-Nonce"]
+            nonce_retried = True
             continue
         if resp.status_code == 401 and session.refresh_token and not refreshed:
             refresh(session)
             refreshed = True
+            nonce_retried = False  # the fresh token may need a fresh nonce
             continue
         break
 

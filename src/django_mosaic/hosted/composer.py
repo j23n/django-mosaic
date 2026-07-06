@@ -13,6 +13,7 @@ import secrets
 import time
 
 import markdown as md
+import requests
 from django.core.cache import cache
 from django.utils.html import strip_tags
 
@@ -51,6 +52,24 @@ def generate_tid():
     return "".join(reversed(chars))
 
 
+_TID_SET = frozenset(TID_ALPHABET)
+
+
+def is_valid_tid(rkey):
+    """Whether `rkey` is a syntactically valid TID (13 chars of the alphabet).
+
+    Guards the public /posts/<rkey> route: an arbitrary segment would flow
+    into a cache key (rejected by memcached for length/chars) and waste a PDS
+    round-trip plus a negative-cache entry per unique junk value.
+    """
+    return (
+        isinstance(rkey, str)
+        and len(rkey) == 13
+        and rkey[0] in "234567abcdefghij"  # top two bits zero
+        and all(c in _TID_SET for c in rkey)
+    )
+
+
 def site_url(tenant):
     """The canonical base URL for a tenant's site (custom domain when live)."""
     if tenant.custom_domain and tenant.domain_verified_at:
@@ -65,7 +84,13 @@ def _flow():
 
 
 def ensure_publication(session, tenant):
-    """The at-uri of the tenant's publication record, created if missing."""
+    """The at-uri of the tenant's publication record, created if missing.
+
+    Only a definitive "record not found" counts as missing. A transient PDS
+    error (5xx, timeout) must NOT be mistaken for absence — creating then
+    would clobber an existing publication record (possibly written by another
+    standard.site app) with unversioned data loss in the user's own repo.
+    """
     uri = f"at://{session.did}/{at_conf.PUBLICATION_NSID}/self"
     try:
         xrpc_get(
@@ -78,8 +103,15 @@ def ensure_publication(session, tenant):
             },
         )
         return uri
-    except AtprotoError:
-        pass
+    except AtprotoError as e:
+        if "RecordNotFound" not in str(e) and " 400" not in str(e):
+            raise ComposerError(
+                "Could not check your publication record; not overwriting it. "
+                "Try again in a moment."
+            ) from e
+    except requests.RequestException as e:
+        raise ComposerError("Your PDS was unreachable; try again shortly.") from e
+
     _flow().xrpc_call(
         session,
         "com.atproto.repo.putRecord",
@@ -140,9 +172,11 @@ def publish(session, tenant, title, body_markdown, description=""):
     if description:
         record["description"] = description
     try:
+        # createRecord (not putRecord) so a TID collision fails loudly instead
+        # of silently overwriting an existing document at the same rkey.
         flow.xrpc_call(
             session,
-            "com.atproto.repo.putRecord",
+            "com.atproto.repo.createRecord",
             method="POST",
             json_body={
                 "repo": session.did,
@@ -153,6 +187,8 @@ def publish(session, tenant, title, body_markdown, description=""):
         )
     except flow.OAuthError as e:
         raise ComposerError(str(e)) from e
+    except requests.RequestException as e:
+        raise ComposerError("Your PDS was unreachable; try again shortly.") from e
 
     _invalidate_read_caches(session.did)
     logger.info("Published document %s for %s", rkey, session.did)

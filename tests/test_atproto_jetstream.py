@@ -59,6 +59,21 @@ class HandleEventTest(TestCase):
             jetstream.handle_event(_commit(collection, rkey="abc"))
             self.assertIsNone(cache.get(key), collection)
 
+    def test_identity_event_drops_handle_cache(self):
+        cache.set("mosaic_atproto:identity:alice.example", "cached", 3600)
+        cursor = jetstream.handle_event(
+            json.dumps(
+                {
+                    "did": DID,
+                    "time_us": 9,
+                    "kind": "identity",
+                    "identity": {"handle": "alice.example"},
+                }
+            )
+        )
+        self.assertEqual(cursor, 9)
+        self.assertIsNone(cache.get("mosaic_atproto:identity:alice.example"))
+
     def test_other_dids_caches_untouched(self):
         other = "mosaic_atproto:collections:did:plc:bob"
         self._prime([other])
@@ -69,9 +84,9 @@ class HandleEventTest(TestCase):
         self.assertIsNone(jetstream.handle_event("not json"))
         self.assertIsNone(jetstream.handle_event(json.dumps(["list"])))
         self.assertIsNone(jetstream.handle_event(None))
-        # Identity/account events return their cursor but touch nothing.
+        # Account events return their cursor but touch nothing.
         cursor = jetstream.handle_event(
-            json.dumps({"did": DID, "time_us": 7, "kind": "identity"})
+            json.dumps({"did": DID, "time_us": 7, "kind": "account"})
         )
         self.assertEqual(cursor, 7)
         # Commit without a collection is tolerated.
@@ -110,11 +125,13 @@ class BuildUrlTest(TestCase):
         MOSAIC_ATPROTO={**conf.as_dict(), "JETSTREAM_URL": "wss://js.example/subscribe"}
     )
     def test_url_carries_dids_and_cursor(self):
-        with mock.patch.object(
-            jetstream, "wanted_dids", return_value=[DID, "did:plc:bob"]
-        ):
-            url = jetstream.build_url(cursor=123)
+        url = jetstream.build_url([DID, "did:plc:bob"], cursor=123)
         self.assertTrue(url.startswith("wss://js.example/subscribe?"))
         self.assertIn("wantedDids=did%3Aplc%3Aalice", url)
         self.assertIn("wantedDids=did%3Aplc%3Abob", url)
         self.assertIn("cursor=123", url)
+
+    def test_empty_dids_refused(self):
+        # An empty wantedDids set would subscribe to the whole firehose.
+        with self.assertRaises(ValueError):
+            jetstream.build_url([])

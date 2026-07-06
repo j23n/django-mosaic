@@ -118,18 +118,34 @@ def save(oauth_session, sections, theme, custom_css=""):
     return record
 
 
+def _as_dict(value):
+    """Coerce an untrusted value to a dict (empty for anything non-dict).
+
+    Records come from the tenant's own repo and may be any shape; every
+    accessor below must survive a string/list/number where a dict is
+    expected rather than 500 the tenant's public site.
+    """
+    return value if isinstance(value, dict) else {}
+
+
 def clean_theme(preset, tokens):
     """Validated theme dict from untrusted input; unknown/invalid dropped."""
-    theme = {"preset": preset if preset in PRESETS else "plain", "tokens": {}}
-    supplied = {k: v for k, v in (tokens or {}).items() if v}
+    # `preset` may be any JSON type from a hostile record — including an
+    # unhashable list — so gate on str before the membership test.
+    if not isinstance(preset, str) or preset not in PRESETS:
+        preset = "plain"
+    theme = {"preset": preset, "tokens": {}}
+    supplied = {k: v for k, v in _as_dict(tokens).items() if v}
     merged = {**PRESETS[theme["preset"]], **supplied}
     for name in COLOR_TOKENS:
         value = str(merged.get(name, "")).strip()
         if COLOR_RE.match(value):
             theme["tokens"][name] = value
-    if merged.get("font") in FONT_CHOICES:
+    # isinstance-guard the membership tests: a hostile token value may be an
+    # unhashable list, which would raise on `x in {...}`.
+    if isinstance(merged.get("font"), str) and merged["font"] in FONT_CHOICES:
         theme["tokens"]["font"] = merged["font"]
-    if merged.get("radius") in RADIUS_CHOICES:
+    if isinstance(merged.get("radius"), str) and merged["radius"] in RADIUS_CHOICES:
         theme["tokens"]["radius"] = merged["radius"]
     return theme
 
@@ -140,7 +156,7 @@ def css_variables(settings_value):
     The record comes from the user's repo, so validation happens on the read
     path too — never trust stored data just because we wrote it once.
     """
-    theme = (settings_value or {}).get("theme") or {}
+    theme = _as_dict(_as_dict(settings_value).get("theme"))
     tokens = clean_theme(theme.get("preset", "plain"), theme.get("tokens"))["tokens"]
     css = {}
     for name in COLOR_TOKENS:
@@ -155,7 +171,7 @@ def css_variables(settings_value):
 
 def custom_css(settings_value):
     """The tenant's custom stylesheet text, size-capped ('' when unset)."""
-    value = (settings_value or {}).get("customCss")
+    value = _as_dict(settings_value).get("customCss")
     if not isinstance(value, str):
         return ""
     return value[:CUSTOM_CSS_MAX]
@@ -179,7 +195,12 @@ def effective_sections(identity, settings_value):
     collections that appeared in the repo since the record was written."""
     configured = []
     seen = set()
-    for entry in (settings_value or {}).get("sections") or []:
+    stored_sections = _as_dict(settings_value).get("sections")
+    if not isinstance(stored_sections, list):
+        stored_sections = []
+    for entry in stored_sections:
+        if not isinstance(entry, dict):
+            continue
         collection = entry.get("collection")
         if not isinstance(collection, str) or collection in seen:
             continue

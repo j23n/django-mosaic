@@ -9,8 +9,10 @@ ownership is proven by the OAuth grant rather than anything we store.
 
 import logging
 
+import requests
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -34,15 +36,26 @@ def _oauth_flow():
     return flow
 
 
+def _tenant_identity(tenant):
+    """Resolve a tenant's Identity from its immutable DID.
+
+    Ownership was proven on the DID at claim time, so we resolve the DID —
+    never the (mutable) handle — to a PDS. If the handle was later taken over
+    by another account, that account's DID differs and cannot hijack this
+    tenant's site.
+    """
+    return identity_mod.resolve_did(tenant.did, handle=tenant.handle)
+
+
 def tenant_home(request):
     """The tenant's site root, rendered live from their PDS."""
     tenant = getattr(request, "tenant", None)
     if tenant is None:
         raise Http404("Not a tenant host.")
     try:
-        identity = identity_mod.resolve(tenant.handle)
+        identity = _tenant_identity(tenant)
     except AtprotoError:
-        logger.warning("Could not resolve tenant handle %s", tenant.handle)
+        logger.warning("Could not resolve tenant DID %s", tenant.did)
         return render(request, "hosted/unavailable.html", status=503)
     profile = preview_mod.fetch_profile(identity)
     built, other_collections = preview_mod.build_sections(identity)
@@ -76,8 +89,11 @@ def tenant_document(request, rkey):
     tenant = getattr(request, "tenant", None)
     if tenant is None:
         raise Http404("Not a tenant host.")
+    # Reject non-TID rkeys before they reach a cache key or a PDS round-trip.
+    if not composer.is_valid_tid(rkey):
+        raise Http404("No such post.")
     try:
-        identity = identity_mod.resolve(tenant.handle)
+        identity = _tenant_identity(tenant)
     except AtprotoError:
         return render(request, "hosted/unavailable.html", status=503)
     value = composer.get_document(identity, rkey)
@@ -108,7 +124,7 @@ def tenant_custom_css(request):
     if tenant is None:
         raise Http404("Not a tenant host.")
     try:
-        identity = identity_mod.resolve(tenant.handle)
+        identity = _tenant_identity(tenant)
     except AtprotoError:
         return HttpResponse("", content_type="text/css", status=503)
     css = site_settings.custom_css(site_settings.load(identity))
@@ -142,7 +158,7 @@ def domain_check(request):
     """
     if not conf.enabled():
         raise Http404("Hosting is not enabled.")
-    domain = (request.GET.get("domain") or "").lower().strip(".")
+    domain = normalize_domain(request.GET.get("domain") or "")
     if domain and _serves_domain(domain):
         return HttpResponse("ok", content_type="text/plain")
     return HttpResponse("unknown domain", content_type="text/plain", status=404)
@@ -204,9 +220,14 @@ def claim(request):
         context.update(error=error, subdomain=subdomain)
         return render(request, "hosted/claim.html", context, status=400)
 
-    tenant = Tenant.objects.create(
-        did=session.did, handle=session.handle, subdomain=subdomain
-    )
+    try:
+        tenant = Tenant.objects.create(
+            did=session.did, handle=session.handle, subdomain=subdomain
+        )
+    except IntegrityError:
+        # Lost a concurrent race for the same subdomain (unique constraint).
+        context.update(error="That subdomain was just taken.", subdomain=subdomain)
+        return render(request, "hosted/claim.html", context, status=409)
     logger.info("Tenant claimed: %s -> %s", tenant.subdomain, tenant.did)
     context["tenant"] = tenant
     return render(request, "hosted/claim.html", context)
@@ -234,7 +255,7 @@ def dashboard(request):
         return redirect("hosted-claim")
 
     try:
-        identity = identity_mod.resolve(tenant.handle)
+        identity = _tenant_identity(tenant)
     except AtprotoError:
         return render(request, "hosted/unavailable.html", status=503)
     stored = site_settings.load(identity)
@@ -268,9 +289,21 @@ def dashboard(request):
         },
     )
     custom_css = request.POST.get("custom_css", "")
+    if len(custom_css) > site_settings.CUSTOM_CSS_MAX:
+        # Reject rather than silently truncate mid-rule.
+        context.update(
+            error=(
+                f"Custom CSS is limited to {site_settings.CUSTOM_CSS_MAX} "
+                "characters."
+            ),
+            sections=sections,
+            theme=theme,
+            custom_css=custom_css,
+        )
+        return render(request, "hosted/dashboard.html", context, status=400)
     try:
         site_settings.save(session, sections, theme, custom_css=custom_css)
-    except flow.OAuthError as e:
+    except (flow.OAuthError, requests.RequestException) as e:
         logger.warning("Settings save failed for %s: %s", session.did, e)
         context.update(
             error=str(e), sections=sections, theme=theme, custom_css=custom_css
@@ -333,19 +366,53 @@ def dashboard_domain(request):
         tenant.save(update_fields=["custom_domain", "domain_verified_at"])
         return redirect("hosted-dashboard")
 
-    domain = (request.POST.get("domain") or "").lower().strip().strip(".")
-    error = _domain_error(domain, tenant)
+    domain = normalize_domain(request.POST.get("domain") or "")
+    error = _domain_error(domain)
+    if not error:
+        error = _register_domain(tenant, domain)
     if error:
         request.session["mosaic_hosted_domain_error"] = error
         return redirect("hosted-dashboard")
-    tenant.custom_domain = domain
-    tenant.domain_verified_at = None  # re-verified on first request
-    tenant.save(update_fields=["custom_domain", "domain_verified_at"])
     logger.info("Custom domain registered: %s -> %s", domain, tenant.did)
     return redirect("hosted-dashboard")
 
 
-def _domain_error(domain, tenant):
+def normalize_domain(value):
+    """Canonical form of a hostname for storage and comparison."""
+    return value.strip().lower().strip(".")
+
+
+def _register_domain(tenant, domain):
+    """Assign `domain` to `tenant`, reclaiming it if only unverified. Returns
+    an error string, or None on success.
+
+    A *verified* domain is locked to its tenant (proven control), so no one
+    can take it. An unverified registration is just a pending intent and can
+    be reclaimed — this stops a squatter from permanently blocking the real
+    owner by registering a string they don't control. Whoever's DNS actually
+    points here verifies on first request and locks it.
+    """
+    with transaction.atomic():
+        holder = (
+            Tenant.objects.select_for_update()
+            .exclude(pk=tenant.pk)
+            .filter(custom_domain=domain)
+            .first()
+        )
+        if holder is not None:
+            if holder.domain_verified_at is not None:
+                return "That domain is already connected to another site."
+            holder.custom_domain = None
+            holder.domain_verified_at = None
+            holder.save(update_fields=["custom_domain", "domain_verified_at"])
+        locked = Tenant.objects.select_for_update().get(pk=tenant.pk)
+        locked.custom_domain = domain
+        locked.domain_verified_at = None  # re-verified on first request
+        locked.save(update_fields=["custom_domain", "domain_verified_at"])
+    return None
+
+
+def _domain_error(domain):
     if not domain:
         return "Enter a domain."
     try:
@@ -355,8 +422,6 @@ def _domain_error(domain, tenant):
     base = conf.base_domain()
     if domain == base or domain.endswith("." + base):
         return f"Domains under {base} are assigned via your subdomain."
-    if Tenant.objects.exclude(pk=tenant.pk).filter(custom_domain=domain).exists():
-        return "That domain is already registered to another site."
     return None
 
 
@@ -418,8 +483,13 @@ def report(request):
     """File an abuse report against a tenant site (?site=<subdomain|domain>).
 
     Anonymous by design (contact optional); honeypot-filtered and throttled
-    per IP. Reports land in the admin, where the Tenant suspend action is
-    one click away.
+    per (IP, site). Reports land in the admin, where the Tenant suspend
+    action is one click away.
+
+    The throttle keys on REMOTE_ADDR: behind a reverse proxy, configure
+    real-IP forwarding (e.g. nginx real_ip) or every visitor shares one
+    bucket. Keying additionally on the reported site means even a collapsed
+    IP can only throttle reports against a single tenant, never globally.
     """
     if not conf.enabled():
         raise Http404("Hosting is not enabled.")
@@ -442,7 +512,7 @@ def report(request):
         return render(request, "hosted/report.html", context, status=400)
 
     ip = request.META.get("REMOTE_ADDR", "")
-    throttle_key = f"mosaic_hosted:report_rate:{ip}"
+    throttle_key = f"mosaic_hosted:report_rate:{ip}:{tenant.pk}"
     if not cache.add(throttle_key, 1, timeout=3600):
         try:
             count = cache.incr(throttle_key)

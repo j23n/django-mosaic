@@ -48,9 +48,12 @@ class TenantMiddleware:
     def _custom_domain_tenant(request):
         """The tenant whose custom domain is this request's Host, or None.
 
-        A request arriving here proves the domain resolves to us over a cert
-        we issued (via the on-demand TLS ask endpoint), so the first hit
-        counts as domain verification.
+        Under the intended deployment — the app reachable only through a TLS
+        proxy that issued the cert via the on-demand ``ask`` endpoint — a
+        request arriving with this Host implies the domain resolves to us, so
+        the first such hit stamps ``domain_verified_at``. This trust rests on
+        the ingress, not on anything Django can see (see docs/hosted-setup.md,
+        "Security model"); only active tenants are stamped.
         """
         if not conf.enabled():
             return None
@@ -59,7 +62,11 @@ class TenantMiddleware:
         if host == base or host.endswith("." + base):
             return None
         tenant = Tenant.objects.filter(custom_domain=host).first()
-        if tenant is not None and tenant.domain_verified_at is None:
+        if (
+            tenant is not None
+            and tenant.status == Tenant.STATUS_ACTIVE
+            and tenant.domain_verified_at is None
+        ):
             tenant.domain_verified_at = timezone.now()
             tenant.save(update_fields=["domain_verified_at"])
             logger.info("Custom domain verified: %s -> %s", host, tenant.did)

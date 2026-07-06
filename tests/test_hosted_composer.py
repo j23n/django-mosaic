@@ -131,6 +131,35 @@ class PublishTest(TestCase):
         self.assertEqual(first["collection"], "site.standard.publication")
         self.assertEqual(first["rkey"], "self")
         self.assertEqual(first["record"]["url"], "https://alice.mosaic.example")
+        # The document is created (not put) so a TID collision fails loudly.
+        self.assertEqual(call.call_args_list[1][0][1], "com.atproto.repo.createRecord")
+
+    def test_transient_publication_error_does_not_overwrite(self):
+        # A 5xx on the publication probe must abort, never clobber the record.
+        tenant = _tenant()
+        session = _oauth_session()
+        with (
+            mock.patch(
+                "django_mosaic.hosted.composer.xrpc_get",
+                side_effect=AtprotoError("XRPC error 503: unavailable"),
+            ),
+            mock.patch("django_mosaic.atproto.oauth.flow.xrpc_call") as call,
+        ):
+            with self.assertRaises(composer.ComposerError):
+                composer.publish(session, tenant, "T", "body")
+        call.assert_not_called()
+
+    def test_pds_network_error_becomes_composer_error(self):
+        import requests
+
+        tenant = _tenant()
+        session = _oauth_session()
+        with mock.patch(
+            "django_mosaic.hosted.composer.xrpc_get",
+            side_effect=requests.ConnectionError("boom"),
+        ):
+            with self.assertRaisesRegex(composer.ComposerError, "unreachable"):
+                composer.publish(session, tenant, "T", "body")
 
     def test_validation_errors(self):
         tenant = _tenant()
@@ -231,10 +260,12 @@ class TenantDocumentPageTest(TestCase):
     def setUp(self):
         cache.clear()
 
-    def _get(self, rkey="abc", value=None, settings_value=None):
+    def _get(self, rkey="3jt5aaaaaaa22", value=None, settings_value=None):
         _tenant()
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch.object(composer, "get_document", return_value=value),
             mock.patch.object(site_settings, "load", return_value=settings_value),
         ):
@@ -257,6 +288,13 @@ class TenantDocumentPageTest(TestCase):
         resp = self._get(value={"title": "T", "textContent": "plain words"})
         self.assertContains(resp, "plain words")
 
+    def test_non_tid_rkey_404s_without_pds_call(self):
+        _tenant()
+        with mock.patch.object(composer, "get_document") as get_document:
+            resp = self.client.get("/posts/not a tid", HTTP_HOST="alice.mosaic.example")
+        self.assertEqual(resp.status_code, 404)
+        get_document.assert_not_called()
+
     def test_missing_document_404s(self):
         resp = self._get(value=None)
         self.assertEqual(resp.status_code, 404)
@@ -277,7 +315,9 @@ class TenantDocumentPageTest(TestCase):
             }
         ]
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch(
                 "django_mosaic.atproto.preview.fetch_profile", return_value=None
             ),
@@ -308,7 +348,9 @@ class CustomCssTest(TestCase):
     def test_served_as_css_with_nosniff(self):
         _tenant()
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch.object(
                 site_settings,
                 "load",
@@ -324,7 +366,9 @@ class CustomCssTest(TestCase):
     def test_empty_when_unset(self):
         _tenant()
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch.object(site_settings, "load", return_value=None),
         ):
             resp = self.client.get("/custom.css", HTTP_HOST="alice.mosaic.example")
@@ -341,7 +385,9 @@ class CustomCssTest(TestCase):
         _sign_in(self.client)
         _tenant()
         with (
-            mock.patch("django_mosaic.atproto.identity.resolve", return_value=ALICE),
+            mock.patch(
+                "django_mosaic.atproto.identity.resolve_did", return_value=ALICE
+            ),
             mock.patch.object(site_settings, "load", return_value=None),
             mock.patch("django_mosaic.atproto.lexicons.describe_repo", return_value=[]),
             mock.patch.object(site_settings, "save") as save,

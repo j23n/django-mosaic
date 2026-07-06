@@ -22,6 +22,7 @@ from django.core.cache import cache
 
 from . import conf, lexicons
 from . import identity as identity_mod
+from . import preview as preview_mod
 
 logger = logging.getLogger("django_mosaic.atproto")
 
@@ -31,9 +32,10 @@ DEFAULT_URL = "wss://jetstream2.us-east.bsky.network/subscribe"
 CURSOR_CACHE_KEY = "mosaic_atproto:jetstream:cursor"
 CURSOR_SAVE_EVERY = 100
 
-# The record-list limits our read paths actually cache under (see
-# lexicons.list_records callers): preview sections and full lexicon pages.
-_LIST_LIMITS = (5, lexicons.MAX_RECORDS)
+# The record-list limits our read paths actually cache under: preview
+# sections and full lexicon pages. Kept in sync with the read paths by
+# importing their constants rather than hardcoding the numbers.
+_LIST_LIMITS = (preview_mod.RECORDS_PER_SECTION, lexicons.MAX_RECORDS)
 
 
 def jetstream_url():
@@ -76,10 +78,19 @@ def handle_event(raw):
     if not isinstance(event, dict):
         return None
     cursor = event.get("time_us")
-
     did = event.get("did")
+    kind = event.get("kind")
+
+    # A handle change would leave the handle→DID cache pointing at the old
+    # resolution for up to an hour; drop it eagerly.
+    if kind == "identity" and did:
+        handle = (event.get("identity") or {}).get("handle")
+        if handle:
+            cache.delete(f"mosaic_atproto:identity:{handle}")
+        return cursor
+
     commit = event.get("commit")
-    if event.get("kind") != "commit" or not did or not isinstance(commit, dict):
+    if kind != "commit" or not did or not isinstance(commit, dict):
         return cursor
     collection = commit.get("collection")
     if not collection:
@@ -105,39 +116,62 @@ def _invalidate(did, collection, rkey=None):
     logger.debug("jetstream: invalidated %s/%s", did, collection)
 
 
-def build_url(base=None, cursor=None):
+def build_url(dids, base=None, cursor=None):
+    """The subscribe URL for an explicit DID list. Never emits an empty
+    ``wantedDids`` set — that would subscribe to the entire firehose."""
     from urllib.parse import urlencode
 
-    params = [("wantedDids", did) for did in wanted_dids()]
+    if not dids:
+        raise ValueError("refusing to build a Jetstream URL with no wantedDids")
+    params = [("wantedDids", did) for did in dids]
     if cursor:
         params.append(("cursor", str(cursor)))
-    query = urlencode(params)
-    return f"{base or jetstream_url()}?{query}" if query else base or jetstream_url()
+    return f"{base or jetstream_url()}?{urlencode(params)}"
 
 
 async def consume(url=None, reconnect_delay_max=60):
-    """Connect and process events forever, reconnecting with backoff."""
+    """Connect and process events forever, reconnecting with backoff.
+
+    ``wanted_dids`` and the cursor touch the database/cache, which is unsafe
+    from an async context, so they are marshalled through ``sync_to_async``.
+    They are recomputed on every (re)connect, so tenants claimed while the
+    consumer is connected are picked up on the next reconnect — force a
+    periodic reconnect if you need them sooner.
+    """
     import asyncio
 
     import websockets
+    from asgiref.sync import sync_to_async
+
+    aget_dids = sync_to_async(wanted_dids)
+    aget_cursor = sync_to_async(lambda: cache.get(CURSOR_CACHE_KEY))
+    aset_cursor = sync_to_async(lambda v: cache.set(CURSOR_CACHE_KEY, v, None))
 
     delay = 1
     while True:
-        cursor = cache.get(CURSOR_CACHE_KEY)
-        full_url = build_url(url, cursor)
+        dids = await aget_dids()
+        if not dids:
+            logger.warning("jetstream: no DIDs to watch; retrying in %ds", delay)
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, reconnect_delay_max)
+            continue
+        full_url = build_url(dids, url, await aget_cursor())
         try:
             async with websockets.connect(full_url) as socket:
-                logger.info("jetstream: connected (%d dids)", len(wanted_dids()))
-                delay = 1
+                logger.info("jetstream: connected (%d dids)", len(dids))
                 seen = 0
                 async for message in socket:
+                    delay = 1  # a live message proves the connection works
                     event_cursor = handle_event(message)
                     seen += 1
                     if event_cursor and seen % CURSOR_SAVE_EVERY == 0:
-                        cache.set(CURSOR_CACHE_KEY, event_cursor, None)
+                        await aset_cursor(event_cursor)
+            # A clean close (server restart/deploy) still backs off, so we
+            # never hot-loop reconnects against a bouncing endpoint.
+            logger.info("jetstream: connection closed; reconnecting in %ds", delay)
         except asyncio.CancelledError:
             raise
         except Exception as e:  # noqa: BLE001 - reconnect on any failure
             logger.warning("jetstream: connection lost (%s); retrying in %ds", e, delay)
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, reconnect_delay_max)
+        await asyncio.sleep(delay)
+        delay = min(delay * 2, reconnect_delay_max)

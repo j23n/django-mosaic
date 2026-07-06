@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from django.core.cache import cache
 
 from . import conf
-from .client import resolve_identity
+from .client import resolve_identity, resolve_pds
 
 logger = logging.getLogger("django_mosaic.atproto")
 
@@ -36,6 +36,26 @@ def resolve(handle):
     if cached:
         return cached
     did, pds_url = resolve_identity(handle)
+    identity = Identity(handle=handle, did=did, pds_url=pds_url)
+    cache.set(cache_key, identity, IDENTITY_CACHE_SECONDS)
+    return identity
+
+
+def resolve_did(did, handle=""):
+    """Resolve an Identity from an immutable DID (not the mutable handle).
+
+    Use this when the DID is the trusted identifier — e.g. a hosted tenant
+    whose ownership was proven at claim time — so a later handle takeover
+    can't redirect the render to a different account. ``handle`` is carried
+    through for display only. Cached per DID.
+
+    Raises AtprotoError on failure (render-path callers catch it).
+    """
+    cache_key = f"mosaic_atproto:identity_did:{did}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+    pds_url = resolve_pds(did)
     identity = Identity(handle=handle, did=did, pds_url=pds_url)
     cache.set(cache_key, identity, IDENTITY_CACHE_SECONDS)
     return identity

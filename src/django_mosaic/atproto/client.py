@@ -69,30 +69,39 @@ def resolve_identity(handle):
         did = resp.json()["did"]
 
     if not pds_url:
-        if did.startswith("did:plc:"):
-            doc = requests.get(f"https://plc.directory/{did}", timeout=timeout)
-        elif did.startswith("did:web:"):
-            domain = did.removeprefix("did:web:")
-            doc = requests.get(
-                f"https://{domain}/.well-known/did.json", timeout=timeout
-            )
-        else:
-            raise AtprotoError(f"Unsupported DID method: {did}")
-        _raise_for_error(doc)
-        services = doc.json().get("service", [])
-        pds = next(
-            (
-                s["serviceEndpoint"]
-                for s in services
-                if s.get("type") == "AtprotoPersonalDataServer"
-            ),
-            None,
-        )
-        if not pds:
-            raise AtprotoError(f"No PDS endpoint in DID document for {did}")
-        pds_url = _validate_pds_url(pds)
+        pds_url = resolve_pds(did, timeout=timeout)
 
     return did, pds_url.rstrip("/")
+
+
+def resolve_pds(did, timeout=None):
+    """Resolve a DID to its PDS endpoint via its DID document.
+
+    The endpoint is SSRF-validated (it comes from an attacker-controllable
+    document once arbitrary DIDs are resolved).
+    """
+    if timeout is None:
+        timeout = conf.get_setting("TIMEOUT")
+    if did.startswith("did:plc:"):
+        doc = requests.get(f"https://plc.directory/{did}", timeout=timeout)
+    elif did.startswith("did:web:"):
+        domain = did.removeprefix("did:web:")
+        doc = requests.get(f"https://{domain}/.well-known/did.json", timeout=timeout)
+    else:
+        raise AtprotoError(f"Unsupported DID method: {did}")
+    _raise_for_error(doc)
+    services = doc.json().get("service", [])
+    pds = next(
+        (
+            s["serviceEndpoint"]
+            for s in services
+            if s.get("type") == "AtprotoPersonalDataServer"
+        ),
+        None,
+    )
+    if not pds:
+        raise AtprotoError(f"No PDS endpoint in DID document for {did}")
+    return _validate_pds_url(pds).rstrip("/")
 
 
 def _raise_for_error(resp):

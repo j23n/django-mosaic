@@ -67,6 +67,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   discovered from DID documents are validated (https, no IP literals or
   internal hosts) against SSRF.
 
+### Security (post-review hardening)
+- OAuth: the discovered authorization server and every endpoint from its
+  metadata are now SSRF-validated (https, no internal/IP hosts) before the
+  client POSTs any client assertion to them; a callback missing the required
+  `iss` parameter is rejected instead of assumed; token refresh is serialized
+  with a row lock so concurrent workers can't burn a rotating refresh token;
+  the authenticated-XRPC retry loop no longer conflates a nonce demand with a
+  refresh and can't exhaust and mis-report a recoverable error.
+- Hosted tenant sites resolve from the immutable claimed DID, not the current
+  handle, so a later handle takeover cannot hijack a subdomain's content.
+- Jetstream: `wanted_dids` runs via `sync_to_async` (the ORM call silently
+  failed in the async loop, dropping every tenant and — with no owner —
+  subscribing to the whole firehose); an empty DID set is refused; reconnect
+  backs off on clean closes too.
+- Composer: a transient PDS error no longer masquerades as "no publication
+  record" and overwrites it; documents are written with `createRecord` so a
+  TID collision fails loudly; `/posts/<rkey>` rejects non-TID keys before
+  touching a cache/PDS; network errors surface as friendly retries, not 500s.
+- Site-settings render helpers tolerate arbitrary hostile record shapes
+  instead of 500-ing a tenant's public page; custom CSS over the cap is
+  rejected rather than silently truncated.
+- Custom domains: an unverified registration can be reclaimed by the real
+  owner (a squatter can no longer permanently block a domain); only verified
+  domains are locked. Concurrent claims/domain writes return a friendly
+  conflict instead of a 500. Report throttle keys on `(IP, site)`.
+
 ## [0.2.0] - 2026-07-03
 
 ### Added

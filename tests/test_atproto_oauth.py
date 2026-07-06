@@ -200,6 +200,30 @@ class DiscoveryTest(TestCase):
             with self.assertRaises(flow.OAuthError):
                 flow.authorization_server_metadata(ISSUER)
 
+    def test_internal_authorization_server_rejected(self):
+        # SSRF guard: an attacker-served protected-resource doc pointing the
+        # "authorization server" at an internal host must be refused.
+        with mock.patch.object(flow, "requests") as m:
+            m.get.return_value = _resp(
+                {"authorization_servers": ["http://169.254.169.254"]}
+            )
+            with self.assertRaises(flow.OAuthError):
+                flow.authorization_server_for("https://pds.x")
+
+    def test_internal_endpoint_in_metadata_rejected(self):
+        # Even with a matching issuer, an internal token/authorize endpoint
+        # is refused before the client ever POSTs a client assertion to it.
+        with mock.patch.object(flow, "requests") as m:
+            m.get.return_value = _resp(
+                {
+                    "issuer": ISSUER,
+                    "authorization_endpoint": f"{ISSUER}/authorize",
+                    "token_endpoint": "http://localhost:9000/token",
+                }
+            )
+            with self.assertRaises(flow.OAuthError):
+                flow.authorization_server_metadata(ISSUER)
+
 
 @override_settings(MOSAIC_ATPROTO=OAUTH_ON)
 class StartAuthTest(TestCase):
@@ -369,12 +393,21 @@ class CompleteAuthTest(TestCase):
     def test_sub_mismatch_rejected(self):
         request = _fake_request(
             session={flow.PENDING_KEY: _pending()},
-            get_params={"code": "c", "state": "state-123"},
+            get_params={"code": "c", "state": "state-123", "iss": ISSUER},
         )
         with mock.patch.object(flow, "requests") as m:
             m.post.return_value = _resp({**TOKENS, "sub": "did:plc:mallory"})
             with self.assertRaisesRegex(flow.OAuthError, "not the expected account"):
                 flow.complete_auth(request)
+        self.assertEqual(OAuthSession.objects.count(), 0)
+
+    def test_missing_iss_rejected(self):
+        request = _fake_request(
+            session={flow.PENDING_KEY: _pending()},
+            get_params={"code": "c", "state": "state-123"},
+        )
+        with self.assertRaisesRegex(flow.OAuthError, "missing the required `iss`"):
+            flow.complete_auth(request)
         self.assertEqual(OAuthSession.objects.count(), 0)
 
     def test_upstream_error_surfaces(self):
@@ -389,7 +422,7 @@ class CompleteAuthTest(TestCase):
         for token in ("at-old", "at-new"):
             request = _fake_request(
                 session={flow.PENDING_KEY: _pending()},
-                get_params={"code": "c", "state": "state-123"},
+                get_params={"code": "c", "state": "state-123", "iss": ISSUER},
             )
             with mock.patch.object(flow, "requests") as m:
                 m.post.return_value = _resp({**TOKENS, "access_token": token})
