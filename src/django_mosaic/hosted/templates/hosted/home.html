@@ -1,0 +1,55 @@
+{% load static %}<!DOCTYPE html>
+{% comment %}
+A tenant's site root, rendered from their PDS. Standalone (a tenant site is
+not the operator's blog, so it doesn't extend base.html); override in your
+deployment to restyle all tenant sites. Context: tenant, identity, profile
+(may be None), sections (each: title, collection, records, record_template),
+other_collections.
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if profile.display_name %}{{ profile.display_name }}{% else %}@{{ identity.handle }}{% endif %}</title>
+  <meta name="description" content="The ATmosphere home of @{{ identity.handle }}">
+  <link rel="stylesheet" href="{% static 'mosaic/css/style.css' %}">
+  <style>
+    .tenant-home { max-width: 46rem; margin: 0 auto; padding: 2rem 1rem; }
+  </style>
+</head>
+<body>
+<main class="tenant-home">
+  <header class="h-card">
+    {% if profile.avatar %}
+    <img class="u-photo" src="{{ profile.avatar }}" alt="" width="72" height="72" style="border-radius: 50%; float: left; margin-right: 1em;">
+    {% endif %}
+    <hgroup>
+      <h1 class="p-name">{% if profile %}{{ profile.display_name }}{% else %}@{{ identity.handle }}{% endif %}</h1>
+      <p class="muted">
+        <a class="u-url muted" href="https://bsky.app/profile/{{ identity.handle }}">@{{ identity.handle }}</a>
+      </p>
+      {% if profile.description %}<p class="p-note">{{ profile.description }}</p>{% endif %}
+    </hgroup>
+    <div style="clear: both;"></div>
+  </header>
+
+  {% for section in sections %}
+  <section>
+    <h2>{{ section.title }}</h2>
+    <ul class="lexicon-records list-plain">
+      {% for record in section.records %}
+      <li class="lexicon-record">{% include section.record_template %}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% empty %}
+  <p class="muted">Nothing published yet.</p>
+  {% endfor %}
+
+  <footer>
+    <p class="muted"><small>Rendered live from public ATmosphere data by
+    <a class="muted" href="https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD">Mosaic</a>.</small></p>
+  </footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,55 @@
+{% load static %}<!DOCTYPE html>
+{% comment %}
+Claim a subdomain for the signed-in ATProto account. Standalone like the
+preview landing; override in your deployment for branding. Context: session
+(OAuthSession or None), tenant (existing/created Tenant or None), login_url,
+base_domain, claim_open, suggested, error, subdomain.
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Claim your home</title>
+  <link rel="stylesheet" href="{% static 'mosaic/css/style.css' %}">
+  <style>
+    .claim { max-width: 30rem; margin: 12vh auto 0; padding: 0 1rem; text-align: center; }
+    .claim form { display: flex; gap: 0.5rem; justify-content: center; margin: 2rem 0; align-items: baseline; }
+    .claim input[type="text"] { padding: 0.6rem 0.8rem; width: 11rem; text-align: right; }
+    .claim .error { color: #b00020; }
+    .claim .domain { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main class="claim">
+    <h1>Claim your home</h1>
+
+    {% if not session %}
+      <p>Sign in with your AT Protocol account to claim your site.</p>
+      <p><a href="{{ login_url }}">Sign in with ATProto</a></p>
+
+    {% elif tenant %}
+      <p>Your home is live:</p>
+      <p class="domain"><a href="//{{ tenant.subdomain }}.{{ base_domain }}">{{ tenant.subdomain }}.{{ base_domain }}</a></p>
+      <p class="muted">Everything you publish across the ATmosphere as
+      <strong>{{ session.handle }}</strong> shows up there automatically.</p>
+
+    {% else %}
+      <p>Signed in as <strong>{{ session.handle }}</strong>. Pick your address:</p>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      {% if claim_open %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="text" name="subdomain" value="{{ subdomain|default:suggested }}"
+               placeholder="you" aria-label="Subdomain" required
+               pattern="[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?" maxlength="63">
+        <span>.{{ base_domain }}</span>
+        <button type="submit">Claim</button>
+      </form>
+      {% else %}
+      <p class="muted">New sites are currently closed.</p>
+      {% endif %}
+    {% endif %}
+  </main>
+</body>
+</html>

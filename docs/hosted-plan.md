@@ -143,6 +143,15 @@ Five screens, all forms — roughly two dozen views total:
 - **M2 — OAuth + claiming + dashboard core** (~4-6 wk): tenant registry,
   subdomain routing, sign-in-with-ATProto, sections + theme presets +
   tokens, settings stored as PDS records.
+  - *M2a shipped:* ATProto OAuth client layer (`django_mosaic.atproto.oauth`
+    behind the `oauth` extra) — confidential client, PAR, PKCE, DPoP,
+    refresh, `OAuthSession` storage, `/oauth/*` routes. Needs live
+    validation against bsky.social (built in a sandbox without egress).
+  - *M2b shipped:* `django_mosaic.hosted` app — `Tenant` registry,
+    `TenantMiddleware` Host routing (subdomain → tenant urlconf),
+    OAuth-gated `/claim` flow, tenant home rendered from the PDS.
+  - *Remaining:* dashboard core (sections/theme/tokens forms), settings
+    stored as PDS records.
 - **M3 — domains + billing** (~3-4 wk): custom domains, on-demand TLS,
   domain-as-handle wizard, Stripe, ToS/report flow.
 - **M4 — write path** (~2-3 wk): dashboard composer publishing via OAuth;

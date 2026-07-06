@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refresh. Ships `/oauth/*` routes, an overridable login page, an
   `OAuthSession` model, `flow.xrpc_call()` for authenticated XRPC as the
   signed-in user, and `manage.py atproto oauth-key` for key generation.
+- Multi-tenant hosting app (`django_mosaic.hosted`, opt-in via
+  `MOSAIC_HOSTED["BASE_DOMAIN"]`): a thin `Tenant` registry (DID ↔
+  subdomain), `TenantMiddleware` that routes `<subdomain>.<base>` hosts to
+  the tenant's site (rendered live from their PDS, standalone template),
+  and an OAuth-gated `/claim` flow with reserved-name and slug validation
+  plus admin suspend/reactivate actions.
 
 ### Changed
 - All ATProto read paths (lexicon pages, blob URLs, record partials) now take

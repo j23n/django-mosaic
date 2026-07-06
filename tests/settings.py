@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "django_magic_authorization",
     "django_mosaic",
     "django_mosaic.atproto",
+    "django_mosaic.hosted",
 ]
 
 MOSAIC_ATPROTO = {

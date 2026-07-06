@@ -1,0 +1,79 @@
+"""Settings access for the hosted (multi-tenant) app.
+
+Everything lives under a single ``MOSAIC_HOSTED`` dict, mirroring
+``MOSAIC_ATPROTO``. The app is inert until ``BASE_DOMAIN`` is set.
+"""
+
+from django.conf import settings
+
+DEFAULTS = {
+    # The apex domain tenants get subdomains of (e.g. "mosaic.example" →
+    # alice.mosaic.example). Required; the app is inert without it. Requests
+    # whose Host is exactly this domain (or not under it at all) fall through
+    # to the normal URLconf.
+    "BASE_DOMAIN": "",
+    # Subdomains that can never be claimed. Merged with a built-in list of
+    # infrastructure names.
+    "RESERVED_SUBDOMAINS": [],
+    # Whether new tenants may claim subdomains. Turn off to freeze signups
+    # while keeping existing tenants served.
+    "CLAIM_OPEN": True,
+}
+
+# Always reserved regardless of settings — infrastructure and confusables.
+BUILTIN_RESERVED = {
+    "www",
+    "mail",
+    "smtp",
+    "imap",
+    "ns1",
+    "ns2",
+    "api",
+    "admin",
+    "static",
+    "media",
+    "cdn",
+    "assets",
+    "blog",
+    "docs",
+    "help",
+    "support",
+    "status",
+    "billing",
+    "dashboard",
+    "app",
+    "oauth",
+    "auth",
+    "login",
+    "preview",
+    "staging",
+    "test",
+    "dev",
+    "mosaic",
+    "official",
+}
+
+
+def get_setting(name):
+    conf = getattr(settings, "MOSAIC_HOSTED", {})
+    return conf.get(name, DEFAULTS[name])
+
+
+def as_dict():
+    return {**DEFAULTS, **getattr(settings, "MOSAIC_HOSTED", {})}
+
+
+def enabled():
+    return bool(get_setting("BASE_DOMAIN"))
+
+
+def base_domain():
+    return get_setting("BASE_DOMAIN").lower().strip(".")
+
+
+def reserved_subdomains():
+    return BUILTIN_RESERVED | {s.lower() for s in get_setting("RESERVED_SUBDOMAINS")}
+
+
+def claim_open():
+    return enabled() and bool(get_setting("CLAIM_OPEN"))
