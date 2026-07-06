@@ -27,6 +27,7 @@ other_collections.
     .tenant-home a { color: var(--mosaic-accent, inherit); }
     .tenant-home img, .tenant-home .lexicon-record { border-radius: var(--mosaic-radius, 0); }
   </style>
+  {% if has_custom_css %}<link rel="stylesheet" href="/custom.css">{% endif %}
 </head>
 <body>
 <main class="tenant-home">

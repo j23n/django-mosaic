@@ -167,6 +167,14 @@ Five screens, all forms — roughly two dozen views total:
     pages, moderation-label handling on rendered content.
 - **M4 — write path** (~2-3 wk): dashboard composer publishing via OAuth;
   custom CSS tier; Jetstream shared ingest.
+  - *Shipped:* `/dashboard/write` composer (TID-minted rkeys,
+    publication ensured on first publish, documents written to the
+    tenant's repo via OAuth), `/posts/<rkey>` document pages on tenant
+    sites (sanitized markdown, textContent fallback), and the custom-CSS
+    tier (stored in the settings record, served standalone at
+    `/custom.css`).
+  - *Remaining:* Jetstream shared ingest for cache invalidation, media
+    uploads (blob) in the composer, editing/deleting published documents.
 
 Realistic total: **3–4 months of focused solo work** to a billable v1, with
 the risk concentrated in OAuth (M2) and the abuse/ops surface (M3). Not a

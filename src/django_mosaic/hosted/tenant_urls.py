@@ -6,10 +6,17 @@ Per-collection pages and dashboard routes land here in later milestones.
 
 from django.urls import path
 
-from .views import tenant_home, tenant_wellknown_did
+from .views import (
+    tenant_custom_css,
+    tenant_document,
+    tenant_home,
+    tenant_wellknown_did,
+)
 
 urlpatterns = [
     path("", tenant_home, name="tenant-home"),
+    path("posts/<str:rkey>", tenant_document, name="tenant-document"),
+    path("custom.css", tenant_custom_css, name="tenant-custom-css"),
     # Domain-as-handle: answers the ATProto handle-verification fetch with
     # the tenant's DID (meaningful on verified custom domains).
     path(".well-known/atproto-did", tenant_wellknown_did, name="tenant-atproto-did"),

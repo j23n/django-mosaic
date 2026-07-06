@@ -27,6 +27,12 @@ SETTINGS_NSID = "blog.mosaic.site.settings"
 SETTINGS_RKEY = "self"
 CACHE_SECONDS = 300
 
+# The custom-CSS escape hatch (the Tumblr/Bearblog model). Size-capped, and
+# served as a standalone text/css response on the tenant's own host — never
+# inlined into HTML — so it cannot inject markup. It styles only the
+# tenant's own site.
+CUSTOM_CSS_MAX = 20_000
+
 # The theme-token vocabulary: every value is validated against these before
 # it gets anywhere near a stylesheet. Enum tokens map to CSS in the template.
 COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
@@ -84,7 +90,7 @@ def load(identity):
     return value
 
 
-def save(oauth_session, sections, theme):
+def save(oauth_session, sections, theme, custom_css=""):
     """Write the settings record to the tenant's repo via their OAuth grant."""
     from django_mosaic.atproto.oauth import flow
 
@@ -94,6 +100,9 @@ def save(oauth_session, sections, theme):
         "theme": theme,
         "updatedAt": timezone.now().isoformat(timespec="seconds"),
     }
+    custom_css = (custom_css or "")[:CUSTOM_CSS_MAX]
+    if custom_css.strip():
+        record["customCss"] = custom_css
     flow.xrpc_call(
         oauth_session,
         "com.atproto.repo.putRecord",
@@ -142,6 +151,14 @@ def css_variables(settings_value):
     if "radius" in tokens:
         css["--mosaic-radius"] = RADIUS_CHOICES[tokens["radius"]]
     return "".join(f"{k}:{v};" for k, v in css.items())
+
+
+def custom_css(settings_value):
+    """The tenant's custom stylesheet text, size-capped ('' when unset)."""
+    value = (settings_value or {}).get("customCss")
+    if not isinstance(value, str):
+        return ""
+    return value[:CUSTOM_CSS_MAX]
 
 
 def default_sections(identity):

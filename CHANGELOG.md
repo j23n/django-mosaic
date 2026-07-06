@@ -45,6 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Abuse reports: `/report` form (anonymous, honeypot-filtered, per-IP
   throttled) feeding a `Report` admin with resolve and
   suspend-the-reported-tenant actions; tenant page footers link to it.
+- Composer (`/dashboard/write`): tenants publish markdown posts as
+  `site.standard.document` records straight into their own PDS (TID rkeys
+  minted locally, publication record ensured on first publish). Documents
+  get `/posts/<rkey>` pages on the tenant site with sanitized markdown
+  rendering and a `textContent` fallback for documents from other apps.
+- Custom CSS tier for hosted tenants: a dashboard stylesheet textarea
+  stored in the settings record and served standalone at `/custom.css`
+  (`text/css` + `nosniff`, never inlined into HTML).
 
 ### Changed
 - All ATProto read paths (lexicon pages, blob URLs, record partials) now take

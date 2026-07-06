@@ -1,0 +1,46 @@
+{% load static %}{% load markdownify %}<!DOCTYPE html>
+{% comment %}
+A single site.standard.document on a tenant site (/posts/<rkey>). Context:
+tenant, identity, document (record value), markdown_source (from the content
+union, may be None), css_variables, has_custom_css. Markdown renders through
+markdownify (bleach-sanitized) since the record is user-authored data.
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ document.title }}</title>
+  {% if document.description %}<meta name="description" content="{{ document.description }}">{% endif %}
+  <link rel="stylesheet" href="{% static 'mosaic/css/style.css' %}">
+  {% if css_variables %}<style>:root { {{ css_variables|safe }} }</style>{% endif %}
+  <style>
+    .tenant-doc { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem; }
+    body {
+      background: var(--mosaic-background, inherit);
+      color: var(--mosaic-text, inherit);
+      font-family: var(--mosaic-font, inherit);
+    }
+    .tenant-doc a { color: var(--mosaic-accent, inherit); }
+    .tenant-doc img { max-width: 100%; border-radius: var(--mosaic-radius, 0); }
+  </style>
+  {% if has_custom_css %}<link rel="stylesheet" href="/custom.css">{% endif %}
+</head>
+<body>
+<main class="tenant-doc h-entry">
+  <p><a href="/">← home</a></p>
+  <article>
+    <h1 class="p-name">{{ document.title }}</h1>
+    {% if document.publishedAt %}
+    <p class="muted"><time class="dt-published" datetime="{{ document.publishedAt }}">{{ document.publishedAt|slice:":10" }}</time></p>
+    {% endif %}
+    <div class="e-content">
+      {% if markdown_source %}
+        {{ markdown_source|markdownify }}
+      {% else %}
+        {{ document.textContent|linebreaks }}
+      {% endif %}
+    </div>
+  </article>
+</main>
+</body>
+</html>

@@ -131,6 +131,30 @@ Bluesky, Settings → Handle → "I have my own domain" → "No DNS panel". The
 dashboard shows this wizard once the domain is connected. This is the
 "your domain is your identity" move nobody else productizes.
 
+## Writing (`/dashboard/write`)
+
+Tenants publish directly from the dashboard: title, optional description,
+markdown body (≤30 kB for now). The composer writes a
+`site.standard.document` record into *their* repo through their OAuth
+grant — a `site.standard.publication` record (rkey `self`) is created on
+first publish so other standard.site readers can attribute the document.
+The rkey is a TID minted client-side, so the record's `path` is its
+permalink from the start.
+
+Published documents get pages on the tenant site at `/posts/<rkey>` —
+markdown renders from the document's mosaic content block
+(bleach-sanitized), falling back to `textContent` for documents written by
+other apps. The "Writing" section on the home page links to these pages.
+
+## Custom CSS
+
+The last rung of the customization ladder before self-hosting: a
+stylesheet textarea on the dashboard, stored in the same settings record
+(`customCss`, capped at 20 k characters) and served at `/custom.css` on the
+tenant's own host — as a standalone `text/css` response (never inlined),
+so it can style but not inject markup. Theme tokens remain available to it
+as `--mosaic-*` custom properties.
+
 ## Reports and moderation
 
 `/report?site=<subdomain or custom domain>` on the base domain files an
@@ -144,5 +168,5 @@ deployment.
 
 ## Not yet built (see the plan)
 
-Billing/paid tiers (Stripe), Jetstream-driven cache invalidation, the
-write path (composer), custom-CSS tier, moderation-label handling.
+Billing/paid tiers (Stripe), Jetstream-driven cache invalidation,
+moderation-label handling, media uploads in the composer.

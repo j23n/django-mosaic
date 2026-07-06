@@ -1,0 +1,16 @@
+{% comment %}
+Record partial for site.standard.document. On tenant sites (documents_linked
+set by the view) titles link to the local /posts/<rkey> page; elsewhere
+(preview mode, lexicon pages) they render unlinked.
+{% endcomment %}
+<article class="lexicon-document h-entry">
+  {% if documents_linked %}
+  <h3 class="p-name"><a class="u-url" href="/posts/{{ record.rkey }}">{{ record.value.title|default:record.rkey }}</a></h3>
+  {% else %}
+  <h3 class="p-name">{{ record.value.title|default:record.rkey }}</h3>
+  {% endif %}
+  {% if record.value.description %}<p class="p-summary">{{ record.value.description }}</p>{% endif %}
+  {% if record.value.publishedAt %}
+  <p class="muted"><time class="dt-published" datetime="{{ record.value.publishedAt }}">{{ record.value.publishedAt|slice:":10" }}</time></p>
+  {% endif %}
+</article>

@@ -20,7 +20,7 @@ from django_mosaic.atproto import identity as identity_mod
 from django_mosaic.atproto import preview as preview_mod
 from django_mosaic.atproto.client import AtprotoError
 
-from . import conf, site_settings
+from . import composer, conf, site_settings
 from .models import Report, Tenant, domain_validator, subdomain_validator
 
 logger = logging.getLogger("django_mosaic.hosted")
@@ -60,11 +60,61 @@ def tenant_home(request):
             "sections": sections,
             "other_collections": other_collections,
             "css_variables": site_settings.css_variables(settings_value),
+            "has_custom_css": bool(site_settings.custom_css(settings_value)),
+            # Consumed by the site.standard.document partial: only tenant
+            # hosts have /posts/<rkey> pages to link to.
+            "documents_linked": True,
             # Reversed against the base domain by hand — this request runs
             # under the tenant urlconf, where hosted-report doesn't exist.
             "report_url": f"//{conf.base_domain()}/report?site={tenant.subdomain}",
         },
     )
+
+
+def tenant_document(request, rkey):
+    """A single published document on the tenant's site (/posts/<rkey>)."""
+    tenant = getattr(request, "tenant", None)
+    if tenant is None:
+        raise Http404("Not a tenant host.")
+    try:
+        identity = identity_mod.resolve(tenant.handle)
+    except AtprotoError:
+        return render(request, "hosted/unavailable.html", status=503)
+    value = composer.get_document(identity, rkey)
+    if value is None:
+        raise Http404("No such post.")
+    settings_value = site_settings.load(identity)
+    return render(
+        request,
+        "hosted/document.html",
+        {
+            "tenant": tenant,
+            "identity": identity,
+            "document": value,
+            "markdown_source": composer.document_markdown(value),
+            "css_variables": site_settings.css_variables(settings_value),
+            "has_custom_css": bool(site_settings.custom_css(settings_value)),
+        },
+    )
+
+
+def tenant_custom_css(request):
+    """The tenant's custom stylesheet (/custom.css), served standalone.
+
+    Kept out of the HTML on purpose: a stylesheet response can't inject
+    markup, and it only ever styles the tenant's own site.
+    """
+    tenant = getattr(request, "tenant", None)
+    if tenant is None:
+        raise Http404("Not a tenant host.")
+    try:
+        identity = identity_mod.resolve(tenant.handle)
+    except AtprotoError:
+        return HttpResponse("", content_type="text/css", status=503)
+    css = site_settings.custom_css(site_settings.load(identity))
+    response = HttpResponse(css, content_type="text/css")
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 def tenant_wellknown_did(request):
@@ -203,6 +253,8 @@ def dashboard(request):
         "saved": request.GET.get("saved") == "1",
         "domain_target": conf.domain_target(),
         "domain_error": request.session.pop("mosaic_hosted_domain_error", ""),
+        "custom_css": site_settings.custom_css(stored),
+        "custom_css_max": site_settings.CUSTOM_CSS_MAX,
     }
     if request.method != "POST":
         return render(request, "hosted/dashboard.html", context)
@@ -215,13 +267,52 @@ def dashboard(request):
             for name in (*site_settings.COLOR_TOKENS, "font", "radius")
         },
     )
+    custom_css = request.POST.get("custom_css", "")
     try:
-        site_settings.save(session, sections, theme)
+        site_settings.save(session, sections, theme, custom_css=custom_css)
     except flow.OAuthError as e:
         logger.warning("Settings save failed for %s: %s", session.did, e)
-        context.update(error=str(e), sections=sections, theme=theme)
+        context.update(
+            error=str(e), sections=sections, theme=theme, custom_css=custom_css
+        )
         return render(request, "hosted/dashboard.html", context, status=502)
     return redirect(f"{reverse('hosted-dashboard')}?saved=1")
+
+
+@require_http_methods(["GET", "POST"])
+def dashboard_write(request):
+    """The composer: publish a standard.site document to the tenant's PDS."""
+    if not conf.enabled():
+        raise Http404("Hosting is not enabled.")
+    flow = _oauth_flow()
+    session = flow.current_session(request)
+    if session is None:
+        return redirect(
+            f"{reverse('atproto-oauth-login')}?next={reverse('hosted-write')}"
+        )
+    tenant = Tenant.objects.filter(did=session.did).first()
+    if tenant is None:
+        return redirect("hosted-claim")
+
+    context = {
+        "session": session,
+        "tenant": tenant,
+        "base_domain": conf.base_domain(),
+        "body_max_kb": composer.BODY_MAX_BYTES // 1000,
+    }
+    if request.method != "POST":
+        return render(request, "hosted/write.html", context)
+
+    title = request.POST.get("title", "")
+    description = request.POST.get("description", "")
+    body = request.POST.get("body", "")
+    try:
+        published = composer.publish(session, tenant, title, body, description)
+    except composer.ComposerError as e:
+        context.update(error=str(e), title=title, description=description, body=body)
+        return render(request, "hosted/write.html", context, status=400)
+    context["published"] = published
+    return render(request, "hosted/write.html", context)
 
 
 @require_POST

@@ -29,6 +29,7 @@ font_choices, radius_choices, saved, error.
   <p class="muted">
     <a href="//{{ tenant.subdomain }}.{{ base_domain }}">{{ tenant.subdomain }}.{{ base_domain }}</a>
     · signed in as {{ session.handle }}
+    · <a href="{% url 'hosted-write' %}">Write a post</a>
   </p>
   {% if saved %}<p class="ok">Saved to your repo.</p>{% endif %}
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
@@ -91,7 +92,17 @@ font_choices, radius_choices, saved, error.
       </select>
     </div>
 
-    <button type="submit">Save</button>
+    <h2>Custom CSS</h2>
+    <p class="muted">The escape hatch: your own stylesheet, served after the
+    theme at <code>/custom.css</code> on your site. Up to
+    {{ custom_css_max }} characters. The theme's values are available as
+    <code>--mosaic-accent</code>, <code>--mosaic-background</code>,
+    <code>--mosaic-text</code>, <code>--mosaic-font</code>, and
+    <code>--mosaic-radius</code>.</p>
+    <textarea name="custom_css" rows="8" style="width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace;"
+              maxlength="{{ custom_css_max }}" aria-label="Custom CSS">{{ custom_css }}</textarea>
+
+    <p><button type="submit">Save</button></p>
   </form>
 
   <h2>Custom domain</h2>
