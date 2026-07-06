@@ -1,0 +1,49 @@
+{% load static %}<!DOCTYPE html>
+{% comment %}
+Landing page for a dedicated preview service (MOSAIC_ATPROTO["PREVIEW_LANDING"]).
+Standalone (doesn't extend base.html) so it reads as a service, not a blog.
+Override this template in your deployment to change the copy/branding.
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mosaic — your home in the ATmosphere</title>
+  <meta name="description" content="See all of your ATmosphere content — posts, projects, books, photos — rendered as one personal site. Type a handle to preview.">
+  <link rel="stylesheet" href="{% static 'mosaic/css/style.css' %}">
+  <style>
+    .landing { max-width: 40rem; margin: 10vh auto 0; padding: 0 1rem; text-align: center; }
+    .landing form.handle { display: flex; gap: 0.5rem; justify-content: center; margin: 2rem 0; }
+    .landing input[type="text"], .landing input[type="email"] { padding: 0.6rem 0.8rem; min-width: 16rem; }
+    .landing .waitlist { margin-top: 4rem; font-size: 0.95em; }
+  </style>
+</head>
+<body>
+  <main class="landing">
+    <h1>Mosaic</h1>
+    <p>Your home in the ATmosphere. Blog posts, code, books, photos, music —
+    everything you do across <a href="https://atproto.com">AT Protocol</a> apps,
+    rendered as one personal site.</p>
+
+    <form class="handle" method="get" action="">
+      <input type="text" name="handle" placeholder="yourname.bsky.social" aria-label="ATProto handle" required>
+      <button type="submit">Preview your home</button>
+    </form>
+    <p class="muted"><small>Read-only. Shows only what's already public in your repo.</small></p>
+
+    <div class="waitlist">
+      {% if joined %}
+      <p><strong>You're on the list — thanks!</strong></p>
+      {% else %}
+      <p>Want this as your own website, on your own domain?</p>
+      <form method="post" action="{% url 'atproto-waitlist' %}">
+        {% csrf_token %}
+        <input type="text" name="website" autocomplete="off" tabindex="-1" aria-hidden="true" style="position: absolute; left: -9999px;">
+        <input type="email" name="contact" placeholder="you@example.com" aria-label="Email" required>
+        <button type="submit">Join the waitlist</button>
+      </form>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>

@@ -15,6 +15,21 @@ class PublicationRecord(models.Model):
         return self.uri
 
 
+class WaitlistSignup(models.Model):
+    """A signup from the preview-service landing page (email or handle)."""
+
+    contact = models.CharField(max_length=320)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["contact"], name="unique_waitlist_contact")
+        ]
+
+    def __str__(self):
+        return self.contact
+
+
 class DocumentRecord(models.Model):
     """Tracks the site.standard.document (and companion post) for a Post."""
 

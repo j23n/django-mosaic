@@ -24,6 +24,29 @@ def enabled():
     return bool(conf.get_setting("PREVIEW"))
 
 
+def landing_enabled():
+    return enabled() and bool(conf.get_setting("PREVIEW_LANDING"))
+
+
+def allow_request(ip):
+    """Cheap fixed-window per-IP throttle for preview loads.
+
+    Uses the cache backend (atomic add/incr); keys expire after a minute.
+    Returns True when the request is within PREVIEW_RATE_LIMIT.
+    """
+    limit = conf.get_setting("PREVIEW_RATE_LIMIT")
+    if not limit:
+        return True
+    cache_key = f"mosaic_atproto:preview_rate:{ip}"
+    if cache.add(cache_key, 1, timeout=60):
+        return True
+    try:
+        count = cache.incr(cache_key)
+    except ValueError:  # key expired between add and incr
+        return True
+    return count <= limit
+
+
 def fetch_profile(identity):
     """Bluesky profile (displayName, avatar, description); None on failure."""
     cache_key = f"mosaic_atproto:profile:{identity.did}"

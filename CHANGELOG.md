@@ -11,7 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Read-only preview mode (`MOSAIC_ATPROTO["PREVIEW"]`): `/@<handle>` renders
   any account's public ATmosphere content — profile header plus sections for
   every known collection present in their repo, other collections listed by
-  name.
+  name. Preview responses are throttled per IP (`PREVIEW_RATE_LIMIT`) and
+  marked `noindex`.
+- Preview-service mode (`PREVIEW_LANDING`): a landing page at the site root
+  with a handle form and a waitlist signup (honeypot-filtered,
+  admin-visible), for deploying a dedicated "see your ATmosphere home"
+  instance.
 - glightbox is vendored (3.3.1, MIT) instead of loaded from the jsdelivr CDN.
 
 ### Changed

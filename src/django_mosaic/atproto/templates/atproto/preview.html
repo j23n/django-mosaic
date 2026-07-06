@@ -7,6 +7,7 @@ your project to restyle. Context: identity, profile (may be None), sections
 
 {% block title %} - @{{ identity.handle }}{% endblock %}
 {% block meta_description %}The ATmosphere home of @{{ identity.handle }}{% endblock %}
+{% block head_extra %}<meta name="robots" content="noindex">{% endblock %}
 
 {% block content %}
 <header class="atproto-preview-header h-card">

@@ -1,11 +1,13 @@
 from django.http import Http404, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from . import conf, lexicons
 from . import identity as identity_mod
 from . import preview as preview_mod
 from .client import AtprotoError
-from .models import PublicationRecord
+from .models import PublicationRecord, WaitlistSignup
 
 
 def lexicon_page(request, page):
@@ -37,9 +39,12 @@ def preview(request, handle):
     """Read-only preview of any handle's ATmosphere content (/@handle).
 
     Opt-in via MOSAIC_ATPROTO["PREVIEW"]; renders only public repo data.
+    Throttled per IP; marked noindex (we render other people's content).
     """
     if not preview_mod.enabled():
         raise Http404("Preview mode is disabled.")
+    if not preview_mod.allow_request(request.META.get("REMOTE_ADDR", "")):
+        return HttpResponse("Rate limit exceeded — try again shortly.", status=429)
     handle = handle.strip().lstrip("@").lower()
     try:
         identity = identity_mod.resolve(handle)
@@ -47,7 +52,7 @@ def preview(request, handle):
         raise Http404(f"Could not resolve handle: {handle}") from e
     profile = preview_mod.fetch_profile(identity)
     sections, other_collections = preview_mod.build_sections(identity)
-    return render(
+    response = render(
         request,
         "atproto/preview.html",
         {
@@ -57,6 +62,40 @@ def preview(request, handle):
             "other_collections": other_collections,
         },
     )
+    response["X-Robots-Tag"] = "noindex"
+    return response
+
+
+def preview_landing(request):
+    """Landing page for a dedicated preview service: handle form + waitlist.
+
+    GET with ?handle= redirects to the preview; plain GET renders the form.
+    Opt-in via MOSAIC_ATPROTO["PREVIEW_LANDING"].
+    """
+    if not preview_mod.landing_enabled():
+        raise Http404("Preview landing is disabled.")
+    handle = (request.GET.get("handle") or "").strip().lstrip("@").lower()
+    if handle:
+        return redirect("atproto-preview", handle=handle)
+    return render(
+        request,
+        "atproto/preview-landing.html",
+        {"joined": request.GET.get("joined") == "1"},
+    )
+
+
+@require_POST
+def waitlist_signup(request):
+    """Store a waitlist signup from the landing page (honeypot-filtered)."""
+    if not preview_mod.landing_enabled():
+        raise Http404("Preview landing is disabled.")
+    if request.POST.get("website"):
+        # Honeypot field filled in: silently pretend success.
+        return redirect(f"{reverse('atproto-preview-landing')}?joined=1")
+    contact = (request.POST.get("contact") or "").strip()[:320]
+    if contact:
+        WaitlistSignup.objects.get_or_create(contact=contact)
+    return redirect(f"{reverse('atproto-preview-landing')}?joined=1")
 
 
 def wellknown_atproto_did(request):

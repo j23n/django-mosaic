@@ -11,9 +11,12 @@ Include at the project root so the well-known paths land on the domain root::
 from django.urls import path
 
 from . import lexicons
+from . import preview as preview_mod
 from .views import (
     lexicon_page,
     preview,
+    preview_landing,
+    waitlist_signup,
     wellknown_atproto_did,
     wellknown_publication,
 )
@@ -32,6 +35,15 @@ urlpatterns = [
         name="atproto-publication",
     ),
 ]
+
+# Dedicated preview-service mode: the landing page takes over the site root
+# (this urlconf is included before mosaic's, so it wins when enabled). Routes
+# are built at import time from settings, like the lexicon pages below.
+if preview_mod.landing_enabled():
+    urlpatterns += [
+        path("", preview_landing, name="atproto-preview-landing"),
+        path("preview/waitlist", waitlist_signup, name="atproto-waitlist"),
+    ]
 
 # One root-level route per configured lexicon page (/projects, /books, ...).
 # Include this urlconf before mosaic's namespace catch-all so these win.

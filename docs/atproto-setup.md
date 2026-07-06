@@ -305,7 +305,19 @@ Defaults are taken from `conf.py` (`DEFAULTS`) and the lexicon/reaction modules.
 | `CONTENT_NSID` | `"blog.mosaic.content.markdown"` | `$type` of the mosaic-native markdown block embedded in the document's open `content` union. Override with your own domain-based NSID if you publish a lexicon for it. |
 | `CONTENT_MAX_INLINE_BYTES` | `30000` | Skip the inline content block above this size to avoid 413s against the PDS record limit; `textContent` still carries the post. |
 | `LEXICON_PAGES` | `{"projects": {...sh.tangled.repo...}, "books": {...buzz.bookhive.book...}}` | Root-level pages rendering repo collections (`{slug: {collection, title}}`). Setting it replaces the defaults. |
-| `PREVIEW` | `False` | Opt-in read-only preview: `/@<handle>` renders any account's public ATmosphere content (profile header + sections for known collections). Public data only; rate-limit at the proxy on internet-facing instances. |
+| `PREVIEW` | `False` | Opt-in read-only preview: `/@<handle>` renders any account's public ATmosphere content (profile header + sections for known collections). Public data only; responses are `noindex`. |
+| `PREVIEW_LANDING` | `False` | Serve a landing page (handle form + waitlist signup) at the site root, turning the instance into a dedicated preview service. Requires `PREVIEW`. Route is built at startup — restart after changing. |
+| `PREVIEW_RATE_LIMIT` | `30` | Max preview loads per client IP per minute (in-app, cache-based; `0` disables). Keys on `REMOTE_ADDR` — behind a proxy, configure real-IP forwarding (e.g. nginx `real_ip`). |
+
+### Running a preview service
+
+To deploy an instance whose only job is previewing handles ("type a handle,
+see their home"): enable `PREVIEW` and `PREVIEW_LANDING`, leave
+`HANDLE`/`APP_PASSWORD` unset (no publishing), and use a shared cache backend
+(e.g. Redis) in production so the rate limiter works across workers. The
+landing page collects waitlist signups into the `WaitlistSignup` model
+(visible in the admin). Preview pages are throttled per IP and marked
+`noindex` since they render other people's content.
 | `APPVIEW_URL` | `"https://public.api.bsky.app"` | Override the Bluesky AppView used for `getPostThread`. Rarely needed. |
 | `CONSTELLATION_URL` | `"https://constellation.microcosm.blue"` | Override the Constellation backlink index. Rarely needed (e.g. self-hosted). |
 

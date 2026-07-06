@@ -66,6 +66,15 @@ DEFAULTS = {
     # ATmosphere content. Public data only; consider rate limiting at the
     # proxy if you enable this on an internet-facing instance.
     "PREVIEW": False,
+    # Serve a landing page (handle input + optional waitlist) at the site
+    # root, turning this instance into a dedicated preview service. Only
+    # honored when PREVIEW is also enabled.
+    "PREVIEW_LANDING": False,
+    # Max preview page loads per client IP per minute (0 disables the
+    # in-app throttle). Behind a reverse proxy, make sure the proxy sets the
+    # real client address (e.g. nginx real_ip) — the throttle keys on
+    # REMOTE_ADDR.
+    "PREVIEW_RATE_LIMIT": 30,
 }
 
 DOCUMENT_NSID = "site.standard.document"
