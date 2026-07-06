@@ -13,8 +13,19 @@ other_collections.
   <title>{% if profile.display_name %}{{ profile.display_name }}{% else %}@{{ identity.handle }}{% endif %}</title>
   <meta name="description" content="The ATmosphere home of @{{ identity.handle }}">
   <link rel="stylesheet" href="{% static 'mosaic/css/style.css' %}">
+  {% comment %} css_variables is built exclusively from validated tokens
+  (hex colors, enum font/radius mapped to our own strings) — see
+  site_settings.css_variables — so it is safe to emit unescaped. {% endcomment %}
+  {% if css_variables %}<style>:root { {{ css_variables|safe }} }</style>{% endif %}
   <style>
     .tenant-home { max-width: 46rem; margin: 0 auto; padding: 2rem 1rem; }
+    body {
+      background: var(--mosaic-background, inherit);
+      color: var(--mosaic-text, inherit);
+      font-family: var(--mosaic-font, inherit);
+    }
+    .tenant-home a { color: var(--mosaic-accent, inherit); }
+    .tenant-home img, .tenant-home .lexicon-record { border-radius: var(--mosaic-radius, 0); }
   </style>
 </head>
 <body>

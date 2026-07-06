@@ -64,7 +64,28 @@ reserved list (`www`, `api`, `oauth`, ... plus your `RESERVED_SUBDOMAINS`).
 Moderation: the `Tenant` admin has suspend/reactivate actions; a suspended
 tenant's subdomain stops serving immediately.
 
+## The dashboard (`/dashboard`)
+
+Signed-in tenants arrange their home at `/dashboard` on the base domain:
+
+- **Sections** — show/hide, retitle, and reorder the per-collection sections
+  of their home page. Collections they publish to later appear automatically
+  until configured.
+- **Theme** — a preset (`plain`, `paper`, `night`) plus individual design
+  tokens: accent/background/text colors, a font choice (sans/serif/mono),
+  and corner radius. Tokens become `--mosaic-*` CSS custom properties on the
+  tenant page; every value is validated against a fixed vocabulary (hex
+  colors, enums) on both write **and** read, so a hand-edited record cannot
+  inject CSS. Free-form custom CSS is a later, deliberate tier — see the
+  plan's customization ladder.
+
+The entire configuration is saved as a single `blog.mosaic.site.settings`
+record (rkey `self`) **in the tenant's own PDS**, written through their
+OAuth grant. Nothing about how their site looks lives in the service
+database — pointing any mosaic instance at the handle reproduces the site,
+configuration included. Reads are public XRPC, cached ~5 minutes.
+
 ## Not yet built (see the plan)
 
-Dashboard (sections/theme/tokens), settings as PDS records, custom domains,
-billing, Jetstream-driven cache invalidation.
+Custom domains, billing, domain-as-handle wizard, Jetstream-driven cache
+invalidation, the write path (composer), custom-CSS tier.

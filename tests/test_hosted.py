@@ -168,6 +168,11 @@ class TenantHomeTest(TestCase):
                 "django_mosaic.atproto.preview.build_sections",
                 return_value=(sections, ["app.test.other"]),
             ),
+            mock.patch("django_mosaic.hosted.site_settings.load", return_value=None),
+            mock.patch(
+                "django_mosaic.atproto.lexicons.describe_repo",
+                return_value=["buzz.bookhive.book"],
+            ),
         ):
             resp = self.client.get("/", HTTP_HOST="alice.mosaic.example")
         self.assertEqual(resp.status_code, 200)

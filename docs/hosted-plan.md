@@ -150,8 +150,11 @@ Five screens, all forms — roughly two dozen views total:
   - *M2b shipped:* `django_mosaic.hosted` app — `Tenant` registry,
     `TenantMiddleware` Host routing (subdomain → tenant urlconf),
     OAuth-gated `/claim` flow, tenant home rendered from the PDS.
-  - *Remaining:* dashboard core (sections/theme/tokens forms), settings
-    stored as PDS records.
+  - *M2c shipped:* dashboard core — `/dashboard` with section
+    order/visibility/titles and theme presets + validated design tokens,
+    all saved as a `blog.mosaic.site.settings` record in the tenant's own
+    PDS (written via their OAuth grant, read back public + cached). M2 is
+    feature-complete pending live OAuth validation.
 - **M3 — domains + billing** (~3-4 wk): custom domains, on-demand TLS,
   domain-as-handle wizard, Stripe, ToS/report flow.
 - **M4 — write path** (~2-3 wk): dashboard composer publishing via OAuth;

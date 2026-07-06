@@ -1,0 +1,98 @@
+{% load static %}<!DOCTYPE html>
+{% comment %}
+Tenant dashboard: section order/visibility/titles + theme preset and tokens.
+Saves to the tenant's own PDS — no site config in the service database.
+Context: session, tenant, base_domain, sections, theme, presets,
+font_choices, radius_choices, saved, error.
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Dashboard — {{ tenant.subdomain }}.{{ base_domain }}</title>
+  <link rel="stylesheet" href="{% static 'mosaic/css/style.css' %}">
+  <style>
+    .dash { max-width: 40rem; margin: 4rem auto; padding: 0 1rem; }
+    .dash table { width: 100%; border-collapse: collapse; margin: 1rem 0 2rem; }
+    .dash td, .dash th { padding: 0.4rem 0.5rem; text-align: left; }
+    .dash input[type="text"] { width: 100%; box-sizing: border-box; }
+    .dash input[type="number"] { width: 4rem; }
+    .dash .theme-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem 1rem; align-items: center; margin: 1rem 0 2rem; }
+    .dash .error { color: #b00020; }
+    .dash .ok { color: #1a7f37; }
+  </style>
+</head>
+<body>
+<main class="dash">
+  <h1>Your home</h1>
+  <p class="muted">
+    <a href="//{{ tenant.subdomain }}.{{ base_domain }}">{{ tenant.subdomain }}.{{ base_domain }}</a>
+    · signed in as {{ session.handle }}
+  </p>
+  {% if saved %}<p class="ok">Saved to your repo.</p>{% endif %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <h2>Sections</h2>
+    <p class="muted">What shows on your home page, in what order. New kinds of
+    content you publish appear automatically until you configure them here.</p>
+    <table>
+      <tr><th>Show</th><th>Title</th><th>Collection</th><th>Position</th></tr>
+      {% for section in sections %}
+      <tr>
+        <td>
+          <input type="hidden" name="collection" value="{{ section.collection }}">
+          <input type="checkbox" name="enabled:{{ section.collection }}"
+                 {% if section.enabled %}checked{% endif %}
+                 aria-label="Show {{ section.title }}">
+        </td>
+        <td><input type="text" name="title:{{ section.collection }}" value="{{ section.title }}" maxlength="100"></td>
+        <td><code class="muted">{{ section.collection }}</code></td>
+        <td><input type="number" name="position:{{ section.collection }}" value="{{ forloop.counter }}" min="1" max="99"></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="muted">Nothing to arrange yet — publish something in the ATmosphere first.</td></tr>
+      {% endfor %}
+    </table>
+
+    <h2>Theme</h2>
+    <div class="theme-grid">
+      <label for="preset">Preset</label>
+      <select name="preset" id="preset">
+        {% for name in presets %}
+        <option value="{{ name }}" {% if theme.preset == name %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="token-accent">Accent</label>
+      <input type="color" name="token-accent" id="token-accent" value="{{ theme.tokens.accent|default:'#0044cc' }}">
+
+      <label for="token-background">Background</label>
+      <input type="color" name="token-background" id="token-background" value="{{ theme.tokens.background|default:'#ffffff' }}">
+
+      <label for="token-text">Text</label>
+      <input type="color" name="token-text" id="token-text" value="{{ theme.tokens.text|default:'#1a1a1a' }}">
+
+      <label for="token-font">Font</label>
+      <select name="token-font" id="token-font">
+        {% for name in font_choices %}
+        <option value="{{ name }}" {% if theme.tokens.font == name %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="token-radius">Corners</label>
+      <select name="token-radius" id="token-radius">
+        {% for name in radius_choices %}
+        <option value="{{ name }}" {% if theme.tokens.radius == name %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit">Save</button>
+  </form>
+</main>
+</body>
+</html>

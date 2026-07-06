@@ -12,8 +12,9 @@ Include on the base domain alongside the atproto URLs (which provide
 
 from django.urls import path
 
-from .views import claim
+from .views import claim, dashboard
 
 urlpatterns = [
     path("claim", claim, name="hosted-claim"),
+    path("dashboard", dashboard, name="hosted-dashboard"),
 ]

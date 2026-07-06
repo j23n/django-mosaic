@@ -33,6 +33,7 @@ base_domain, claim_open, suggested, error, subdomain.
       <p class="domain"><a href="//{{ tenant.subdomain }}.{{ base_domain }}">{{ tenant.subdomain }}.{{ base_domain }}</a></p>
       <p class="muted">Everything you publish across the ATmosphere as
       <strong>{{ session.handle }}</strong> shows up there automatically.</p>
+      <p><a href="{% url 'hosted-dashboard' %}">Arrange your home →</a></p>
 
     {% else %}
       <p>Signed in as <strong>{{ session.handle }}</strong>. Pick your address:</p>

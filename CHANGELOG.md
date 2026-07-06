@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tenant's site (rendered live from their PDS, standalone template),
   and an OAuth-gated `/claim` flow with reserved-name and slug validation
   plus admin suspend/reactivate actions.
+- Tenant dashboard (`/dashboard`): arrange home-page sections (show/hide,
+  retitle, reorder) and pick a theme — presets plus validated design tokens
+  (colors, font, radius) emitted as `--mosaic-*` CSS custom properties. The
+  whole configuration is stored as a `blog.mosaic.site.settings` record in
+  the tenant's own PDS via their OAuth grant; the service database holds no
+  site config.
 
 ### Changed
 - All ATProto read paths (lexicon pages, blob URLs, record partials) now take
