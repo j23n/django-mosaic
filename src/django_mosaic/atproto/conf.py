@@ -75,6 +75,24 @@ DEFAULTS = {
     # real client address (e.g. nginx real_ip) — the throttle keys on
     # REMOTE_ADDR.
     "PREVIEW_RATE_LIMIT": 30,
+    # ATProto OAuth client (requires the `oauth` extra:
+    # `pip install django-mosaic[oauth]`). Lets visitors sign in with their
+    # own ATProto account — the building block for site claiming and any
+    # write-on-behalf features. Inert until BASE_URL and PRIVATE_KEY are set.
+    "OAUTH_CLIENT": {
+        # Public https origin this instance is served from; the client is
+        # identified by <BASE_URL>/oauth/client-metadata.json, which
+        # authorization servers fetch, so it must be reachable from the
+        # internet (no localhost).
+        "BASE_URL": "",
+        # PEM-encoded ES256 (P-256) private key used as the confidential
+        # client key (private_key_jwt). Generate one with
+        # `manage.py atproto oauth-key` and supply it via an env var.
+        "PRIVATE_KEY": "",
+        # Key id published in jwks.json; rotate by changing both.
+        "KEY_ID": "mosaic-oauth-1",
+        "SCOPE": "atproto transition:generic",
+    },
 }
 
 DOCUMENT_NSID = "site.standard.document"
@@ -94,6 +112,16 @@ def as_dict():
 
 def enabled():
     return bool(get_setting("HANDLE") and get_setting("APP_PASSWORD"))
+
+
+def oauth_client():
+    """The merged OAUTH_CLIENT sub-dict (defaults overlaid with settings)."""
+    return {**DEFAULTS["OAUTH_CLIENT"], **(get_setting("OAUTH_CLIENT") or {})}
+
+
+def oauth_enabled():
+    client = oauth_client()
+    return bool(client["BASE_URL"] and client["PRIVATE_KEY"])
 
 
 def publication_url():

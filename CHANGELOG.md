@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin-visible), for deploying a dedicated "see your ATmosphere home"
   instance.
 - glightbox is vendored (3.3.1, MIT) instead of loaded from the jsdelivr CDN.
+- ATProto OAuth client (`MOSAIC_ATPROTO["OAUTH_CLIENT"]`, requires the new
+  `oauth` extra): visitors sign in with any ATProto account. Implements the
+  atproto OAuth profile — confidential client (`private_key_jwt` + published
+  JWKS), PAR, PKCE S256, DPoP-bound tokens with nonce handling and automatic
+  refresh. Ships `/oauth/*` routes, an overridable login page, an
+  `OAuthSession` model, `flow.xrpc_call()` for authenticated XRPC as the
+  signed-in user, and `manage.py atproto oauth-key` for key generation.
 
 ### Changed
 - All ATProto read paths (lexicon pages, blob URLs, record partials) now take

@@ -8,9 +8,10 @@ Include at the project root so the well-known paths land on the domain root::
     ]
 """
 
+from django.core.exceptions import ImproperlyConfigured
 from django.urls import path
 
-from . import lexicons
+from . import conf, lexicons
 from . import preview as preview_mod
 from .views import (
     lexicon_page,
@@ -43,6 +44,28 @@ if preview_mod.landing_enabled():
     urlpatterns += [
         path("", preview_landing, name="atproto-preview-landing"),
         path("preview/waitlist", waitlist_signup, name="atproto-waitlist"),
+    ]
+
+# ATProto OAuth client (sign in with any ATProto account). Routes appear only
+# when OAUTH_CLIENT is configured; the modules need the `oauth` extra.
+if conf.oauth_enabled():
+    try:
+        from .oauth import views as oauth_views
+    except ImportError as exc:
+        raise ImproperlyConfigured(
+            "MOSAIC_ATPROTO['OAUTH_CLIENT'] is configured but the OAuth "
+            "dependencies are missing — install django-mosaic[oauth]."
+        ) from exc
+    urlpatterns += [
+        path(
+            "oauth/client-metadata.json",
+            oauth_views.client_metadata,
+            name="atproto-oauth-client-metadata",
+        ),
+        path("oauth/jwks.json", oauth_views.jwks, name="atproto-oauth-jwks"),
+        path("oauth/login", oauth_views.login, name="atproto-oauth-login"),
+        path("oauth/callback", oauth_views.callback, name="atproto-oauth-callback"),
+        path("oauth/logout", oauth_views.logout, name="atproto-oauth-logout"),
     ]
 
 # One root-level route per configured lexicon page (/projects, /books, ...).

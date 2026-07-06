@@ -53,6 +53,11 @@ class Command(BaseCommand):
             "--post", type=int, required=True, help="A synced post id to probe"
         )
 
+        sub.add_parser(
+            "oauth-key",
+            help="Generate an ES256 private key for OAUTH_CLIENT['PRIVATE_KEY']",
+        )
+
     def handle(self, *args, **options):
         command = options["command"]
         if command == "status":
@@ -61,6 +66,8 @@ class Command(BaseCommand):
             return self._warm(options.get("post"))
         if command == "check":
             return self._check(options["post"])
+        if command == "oauth-key":
+            return self._oauth_key()
 
         if not conf.enabled():
             raise CommandError(
@@ -100,6 +107,21 @@ class Command(BaseCommand):
             raise CommandError(f"Post {post_id} does not exist.")
         publisher.unpublish_post(post, delete_companion=delete_companion)
         self.stdout.write(self.style.SUCCESS(f"  ✓ removed records for {post.title}"))
+
+    def _oauth_key(self):
+        """Print a fresh ES256 private key PEM for the OAuth client.
+
+        Store it outside settings (env var, secret manager) and reference it
+        from MOSAIC_ATPROTO["OAUTH_CLIENT"]["PRIVATE_KEY"]. The PEM goes to
+        stdout only — nothing is written to disk or the database.
+        """
+        try:
+            from django_mosaic.atproto.oauth.keys import generate_private_key_pem
+        except ImportError as exc:
+            raise CommandError(
+                "The OAuth dependencies are missing — install django-mosaic[oauth]."
+            ) from exc
+        self.stdout.write(generate_private_key_pem())
 
     def _status(self):
         self.stdout.write(f"Configured: {conf.enabled()}")

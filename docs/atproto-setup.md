@@ -284,6 +284,73 @@ mosaic):
 Because records are passed through as raw JSON, templates read fields directly
 (`{{ record.value.title }}`) and missing/evolved fields simply render blank.
 
+## Sign in with ATProto (OAuth)
+
+The bridge includes a full ATProto OAuth client, so *visitors* can sign in to
+your mosaic instance with their own ATProto account (any Bluesky handle or
+self-hosted PDS). This is separate from the owner app-password bridge above:
+the app password publishes *your* posts; OAuth authenticates *other people*
+(or you, without sharing a password) — the building block for site claiming
+and acting on a user's behalf within the granted scope.
+
+It implements the ATProto OAuth profile: a confidential client
+(`private_key_jwt` with a published JWKS), pushed authorization requests
+(PAR), PKCE (S256), and DPoP-bound tokens with automatic nonce handling and
+token refresh.
+
+### Setup
+
+1. Install the extra: `pip install django-mosaic[oauth]` (pulls in `pyjwt` +
+   `cryptography`).
+2. Generate a client signing key and store it as a secret (env var, secret
+   manager — never in settings files):
+
+   ```
+   python manage.py atproto oauth-key
+   ```
+
+3. Configure the client. `BASE_URL` must be the public **https** origin the
+   instance is served from — authorization servers fetch
+   `<BASE_URL>/oauth/client-metadata.json` to validate the client, so
+   localhost won't work in production:
+
+   ```python
+   MOSAIC_ATPROTO = {
+       # ...
+       "OAUTH_CLIENT": {
+           "BASE_URL": "https://example.com",
+           "PRIVATE_KEY": os.environ["MOSAIC_OAUTH_PRIVATE_KEY"],
+       },
+   }
+   ```
+
+4. Restart. The routes are built at startup (like the lexicon pages):
+   `/oauth/client-metadata.json`, `/oauth/jwks.json`, `/oauth/login`,
+   `/oauth/callback`, and `/oauth/logout` (POST).
+
+Visitors go to `/oauth/login`, enter their handle, and are redirected to
+their own authorization server to approve. Sessions are stored in the
+`OAuthSession` model (one row per DID; the admin shows who is connected and
+deleting a row revokes server-side use). The login page template is
+`atproto/oauth-login.html` — override it to match your branding.
+
+Programmatic use, e.g. reading or writing records as the signed-in user:
+
+```python
+from django_mosaic.atproto.oauth import flow
+
+session = flow.current_session(request)  # None if not signed in
+if session:
+    flow.xrpc_call(
+        session, "com.atproto.repo.listRecords",
+        params={"repo": session.did, "collection": "app.bsky.feed.like"},
+    )
+```
+
+`xrpc_call` refreshes expired access tokens automatically and handles the
+DPoP nonce dance. Note the tokens and per-session DPoP keys in `OAuthSession`
+are secrets — protect the database accordingly.
+
 ## Reference: `MOSAIC_ATPROTO` keys
 
 Defaults are taken from `conf.py` (`DEFAULTS`) and the lexicon/reaction modules.
@@ -308,6 +375,9 @@ Defaults are taken from `conf.py` (`DEFAULTS`) and the lexicon/reaction modules.
 | `PREVIEW` | `False` | Opt-in read-only preview: `/@<handle>` renders any account's public ATmosphere content (profile header + sections for known collections). Public data only; responses are `noindex`. |
 | `PREVIEW_LANDING` | `False` | Serve a landing page (handle form + waitlist signup) at the site root, turning the instance into a dedicated preview service. Requires `PREVIEW`. Route is built at startup — restart after changing. |
 | `PREVIEW_RATE_LIMIT` | `30` | Max preview loads per client IP per minute (in-app, cache-based; `0` disables). Keys on `REMOTE_ADDR` — behind a proxy, configure real-IP forwarding (e.g. nginx `real_ip`). |
+| `OAUTH_CLIENT` | `{...}` (inert) | ATProto OAuth client config; see [Sign in with ATProto](#sign-in-with-atproto-oauth). Sub-keys: `BASE_URL` (**required** to enable), `PRIVATE_KEY` (**required**; PEM ES256 key), `KEY_ID` (`"mosaic-oauth-1"`), `SCOPE` (`"atproto transition:generic"`). |
+| `APPVIEW_URL` | `"https://public.api.bsky.app"` | Override the Bluesky AppView used for `getPostThread`. Rarely needed. |
+| `CONSTELLATION_URL` | `"https://constellation.microcosm.blue"` | Override the Constellation backlink index. Rarely needed (e.g. self-hosted). |
 
 ### Running a preview service
 
@@ -318,8 +388,6 @@ see their home"): enable `PREVIEW` and `PREVIEW_LANDING`, leave
 landing page collects waitlist signups into the `WaitlistSignup` model
 (visible in the admin). Preview pages are throttled per IP and marked
 `noindex` since they render other people's content.
-| `APPVIEW_URL` | `"https://public.api.bsky.app"` | Override the Bluesky AppView used for `getPostThread`. Rarely needed. |
-| `CONSTELLATION_URL` | `"https://constellation.microcosm.blue"` | Override the Constellation backlink index. Rarely needed (e.g. self-hosted). |
 
 The document `coverImage` is set from the post's featured thumbnail (uploaded
 once and reused for the companion post embed). A core mosaic setting,
