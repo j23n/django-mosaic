@@ -22,6 +22,9 @@ DEFAULTS = {
     # Lets a self-hoster pin claiming to their own DID from first boot instead
     # of claiming and then flipping CLAIM_OPEN off.
     "CLAIM_ALLOWED_DIDS": [],
+    # The DNS target shown in the custom-domain instructions (what tenants
+    # point their CNAME/ALIAS at). Defaults to the base domain.
+    "DOMAIN_TARGET": "",
 }
 
 # Always reserved regardless of settings — infrastructure and confusables.
@@ -87,3 +90,7 @@ def claim_allowed(did):
     """Whether this DID may claim a site (CLAIM_ALLOWED_DIDS empty = anyone)."""
     allowed = get_setting("CLAIM_ALLOWED_DIDS")
     return not allowed or did in allowed
+
+
+def domain_target():
+    return get_setting("DOMAIN_TARGET") or base_domain()

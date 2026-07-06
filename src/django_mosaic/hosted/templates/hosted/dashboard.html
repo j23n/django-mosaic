@@ -93,6 +93,47 @@ font_choices, radius_choices, saved, error.
 
     <button type="submit">Save</button>
   </form>
+
+  <h2>Custom domain</h2>
+  {% if domain_error %}<p class="error">{{ domain_error }}</p>{% endif %}
+  {% if tenant.custom_domain %}
+    <p>
+      <span class="domain">{{ tenant.custom_domain }}</span>
+      {% if tenant.domain_verified_at %}
+        <span class="ok">✓ connected</span>
+      {% else %}
+        <span class="muted">waiting for DNS…</span>
+      {% endif %}
+    </p>
+    {% if not tenant.domain_verified_at %}
+    <p class="muted">Point a CNAME (or ALIAS/ANAME at the apex) for
+    <code>{{ tenant.custom_domain }}</code> to <code>{{ domain_target }}</code>.
+    The certificate is issued and the domain marked connected on its first
+    visit once DNS propagates.</p>
+    {% else %}
+    <details>
+      <summary>Use this domain as your ATProto handle</summary>
+      <p class="muted">Your DID is served at
+      <code>https://{{ tenant.custom_domain }}/.well-known/atproto-did</code>,
+      so you can make <strong>{{ tenant.custom_domain }}</strong> your handle:
+      in Bluesky, Settings → Handle → “I have my own domain” → “No DNS
+      panel” → enter the domain and verify. Your old handle keeps working as
+      an alias until you change it back.</p>
+    </details>
+    {% endif %}
+    <form method="post" action="{% url 'hosted-dashboard-domain' %}">
+      {% csrf_token %}
+      <button type="submit" name="remove" value="1">Remove domain</button>
+    </form>
+  {% else %}
+    <p class="muted">Serve your home at your own domain instead of
+    {{ tenant.subdomain }}.{{ base_domain }}.</p>
+    <form method="post" action="{% url 'hosted-dashboard-domain' %}">
+      {% csrf_token %}
+      <input type="text" name="domain" placeholder="you.example.com" aria-label="Custom domain">
+      <button type="submit">Connect</button>
+    </form>
+  {% endif %}
 </main>
 </body>
 </html>

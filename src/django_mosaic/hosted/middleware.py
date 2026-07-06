@@ -16,6 +16,7 @@ Django accepts the subdomain hosts in the first place.
 import logging
 
 from django.http import Http404
+from django.utils import timezone
 
 from . import conf
 from .models import Tenant
@@ -29,16 +30,40 @@ class TenantMiddleware:
 
     def __call__(self, request):
         request.tenant = None
-        subdomain = self._subdomain(request)
-        if subdomain:
-            tenant = Tenant.objects.filter(subdomain=subdomain).first()
-            if tenant is None:
-                raise Http404(f"No site at {subdomain}.{conf.base_domain()}.")
+        tenant = self._custom_domain_tenant(request)
+        if tenant is None:
+            subdomain = self._subdomain(request)
+            if subdomain:
+                tenant = Tenant.objects.filter(subdomain=subdomain).first()
+                if tenant is None:
+                    raise Http404(f"No site at {subdomain}.{conf.base_domain()}.")
+        if tenant is not None:
             if tenant.status != Tenant.STATUS_ACTIVE:
                 raise Http404("This site is unavailable.")
             request.tenant = tenant
             request.urlconf = "django_mosaic.hosted.tenant_urls"
         return self.get_response(request)
+
+    @staticmethod
+    def _custom_domain_tenant(request):
+        """The tenant whose custom domain is this request's Host, or None.
+
+        A request arriving here proves the domain resolves to us over a cert
+        we issued (via the on-demand TLS ask endpoint), so the first hit
+        counts as domain verification.
+        """
+        if not conf.enabled():
+            return None
+        host = request.get_host().split(":", 1)[0].lower().strip(".")
+        base = conf.base_domain()
+        if host == base or host.endswith("." + base):
+            return None
+        tenant = Tenant.objects.filter(custom_domain=host).first()
+        if tenant is not None and tenant.domain_verified_at is None:
+            tenant.domain_verified_at = timezone.now()
+            tenant.save(update_fields=["domain_verified_at"])
+            logger.info("Custom domain verified: %s -> %s", host, tenant.did)
+        return tenant
 
     @staticmethod
     def _subdomain(request):

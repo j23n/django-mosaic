@@ -85,7 +85,64 @@ OAuth grant. Nothing about how their site looks lives in the service
 database — pointing any mosaic instance at the handle reproduces the site,
 configuration included. Reads are public XRPC, cached ~5 minutes.
 
+## Custom domains
+
+Tenants connect their own domain from the dashboard. There is no explicit
+verification step — control is proven by serving:
+
+1. The tenant enters `blog.example.com` on `/dashboard` (validated: real
+   hostname, not under the base domain, not registered to another tenant).
+2. They point DNS at your server: a CNAME to `DOMAIN_TARGET` (defaults to
+   the base domain), or ALIAS/ANAME at an apex.
+3. TLS is issued on demand. Configure your proxy to ask us first — with
+   Caddy:
+
+   ```
+   {
+       on_demand_tls {
+           ask http://127.0.0.1:8000/domains/check
+       }
+   }
+
+   https:// {
+       tls {
+           on_demand
+       }
+       reverse_proxy 127.0.0.1:8000
+   }
+   ```
+
+   `/domains/check?domain=<host>` answers 200 only for domains an active
+   tenant has registered, so certificates are never requested for hosts we
+   won't serve. Issuance itself can only succeed if the DNS actually points
+   at us (ACME), which is the real ownership proof.
+4. The first request arriving with that Host marks the domain verified
+   (`domain_verified_at`); the dashboard flips from "waiting for DNS" to
+   connected.
+
+A squatted domain string (registered here but never pointed at us) never
+verifies and can be cleared in the admin.
+
+### Domain-as-handle
+
+Tenant hosts serve `/.well-known/atproto-did` with the tenant's DID, so a
+connected custom domain can become the tenant's ATProto *handle*: in
+Bluesky, Settings → Handle → "I have my own domain" → "No DNS panel". The
+dashboard shows this wizard once the domain is connected. This is the
+"your domain is your identity" move nobody else productizes.
+
+## Reports and moderation
+
+`/report?site=<subdomain or custom domain>` on the base domain files an
+abuse report (anonymous, optional contact, honeypot-filtered, per-IP
+throttled). Reports appear in the admin with resolve and
+suspend-the-reported-tenant actions; tenant pages link the form in their
+footer. Suspension takes effect on the next request — the middleware
+checks status on every hit — and also drops the domain from the on-demand
+TLS ask endpoint. Pair this with actual ToS/legal pages for your
+deployment.
+
 ## Not yet built (see the plan)
 
-Custom domains, billing, domain-as-handle wizard, Jetstream-driven cache
-invalidation, the write path (composer), custom-CSS tier.
+Billing/paid tiers (Stripe), Jetstream-driven cache invalidation, the
+write path (composer), custom-CSS tier, moderation-label handling.

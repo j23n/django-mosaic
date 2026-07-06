@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole configuration is stored as a `blog.mosaic.site.settings` record in
   the tenant's own PDS via their OAuth grant; the service database holds no
   site config.
+- Custom domains for hosted tenants: connect a domain from the dashboard,
+  `/domains/check` on-demand TLS `ask` endpoint (Caddy integration),
+  verification implicit in the first served request. Tenant hosts serve
+  `/.well-known/atproto-did`, enabling the domain-as-handle wizard shown on
+  connected domains.
+- Abuse reports: `/report` form (anonymous, honeypot-filtered, per-IP
+  throttled) feeding a `Report` admin with resolve and
+  suspend-the-reported-tenant actions; tenant page footers link to it.
 
 ### Changed
 - All ATProto read paths (lexicon pages, blob URLs, record partials) now take

@@ -1,0 +1,47 @@
+{% load static %}<!DOCTYPE html>
+{% comment %}
+Abuse report form (?site=<subdomain or custom domain>). Context: site,
+tenant (may be None), submitted, error, base_domain.
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Report a site</title>
+  <link rel="stylesheet" href="{% static 'mosaic/css/style.css' %}">
+  <style>
+    .report { max-width: 30rem; margin: 10vh auto 0; padding: 0 1rem; }
+    .report textarea { width: 100%; min-height: 8rem; box-sizing: border-box; }
+    .report input[type="text"], .report input[type="email"] { width: 100%; box-sizing: border-box; }
+    .report .hp { position: absolute; left: -9999px; }
+    .report .error { color: #b00020; }
+    .report label { display: block; margin: 1rem 0 0.25rem; }
+  </style>
+</head>
+<body>
+<main class="report">
+  <h1>Report a site</h1>
+  {% if submitted %}
+    <p>Thanks — the report has been received and will be reviewed.</p>
+  {% else %}
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <p class="muted">Sites here render their owner's public ATmosphere
+    content. If a site hosted on {{ base_domain }} violates the terms of
+    service, describe the problem below.</p>
+    <form method="post">
+      {% csrf_token %}
+      <label for="site">Site</label>
+      <input type="text" name="site" id="site" value="{{ site }}"
+             placeholder="subdomain or custom domain" required>
+      <label for="reason">What's wrong?</label>
+      <textarea name="reason" id="reason" maxlength="2000" required></textarea>
+      <label for="contact">Your contact (optional)</label>
+      <input type="email" name="contact" id="contact" placeholder="you@example.com">
+      <p class="hp"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></p>
+      <p><button type="submit">Send report</button></p>
+    </form>
+  {% endif %}
+</main>
+</body>
+</html>

@@ -157,6 +157,14 @@ Five screens, all forms — roughly two dozen views total:
     feature-complete pending live OAuth validation.
 - **M3 — domains + billing** (~3-4 wk): custom domains, on-demand TLS,
   domain-as-handle wizard, Stripe, ToS/report flow.
+  - *Shipped:* custom domains end-to-end (dashboard connect flow,
+    `/domains/check` on-demand TLS ask endpoint for Caddy, verification
+    implicit in first served request), per-tenant
+    `/.well-known/atproto-did` + dashboard domain-as-handle wizard, and
+    the report → admin-suspend moderation flow.
+  - *Remaining:* Stripe billing and paid-tier gating (needs real account
+    keys/webhooks — deliberately left for a live environment), ToS/legal
+    pages, moderation-label handling on rendered content.
 - **M4 — write path** (~2-3 wk): dashboard composer publishing via OAuth;
   custom CSS tier; Jetstream shared ingest.
 
