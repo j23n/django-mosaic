@@ -173,8 +173,11 @@ Five screens, all forms — roughly two dozen views total:
     sites (sanitized markdown, textContent fallback), and the custom-CSS
     tier (stored in the settings record, served standalone at
     `/custom.css`).
-  - *Remaining:* Jetstream shared ingest for cache invalidation, media
-    uploads (blob) in the composer, editing/deleting published documents.
+  - *Shipped:* Jetstream shared ingest (`manage.py atproto jetstream`,
+    `jetstream` extra) — one websocket over owner + active tenants,
+    cursor-resumed, invalidating per-DID caches on writes.
+  - *Remaining:* media uploads (blob) in the composer, editing/deleting
+    published documents.
 
 Realistic total: **3–4 months of focused solo work** to a billable v1, with
 the risk concentrated in OAuth (M2) and the abuse/ops surface (M3). Not a

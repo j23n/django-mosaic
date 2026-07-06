@@ -166,7 +166,26 @@ checks status on every hit — and also drops the domain from the on-demand
 TLS ask endpoint. Pair this with actual ToS/legal pages for your
 deployment.
 
+## Data freshness
+
+Tenant pages read from TTL caches (records ~5 min, profiles ~10 min,
+settings ~5 min). For a hosted service, run the Jetstream consumer as a
+long-lived process next to the web workers:
+
+```
+pip install django-mosaic[jetstream]
+python manage.py atproto jetstream
+```
+
+It opens one websocket with `wantedDids` = the owner plus every active
+tenant and drops the relevant caches the moment an account writes to its
+repo — publish something anywhere in the ATmosphere and your mosaic home
+updates seconds later. It resumes from a stored cursor after restarts and
+is purely an optimization: if it's down, pages just fall back to TTL
+staleness. (Jetstream caps `wantedDids` at 10 000 — shard consumers when
+you outgrow that.)
+
 ## Not yet built (see the plan)
 
-Billing/paid tiers (Stripe), Jetstream-driven cache invalidation,
-moderation-label handling, media uploads in the composer.
+Billing/paid tiers (Stripe), moderation-label handling, media uploads and
+edit/delete in the composer.

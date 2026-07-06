@@ -51,6 +51,9 @@ oauth = [
     "cryptography>=42",
     "pyjwt>=2.8",
 ]
+jetstream = [
+    "websockets>=12",
+]
 
 [project.scripts]
 # Bootstrap a runnable project: `mosaic-admin init myblog`.

@@ -75,6 +75,9 @@ DEFAULTS = {
     # real client address (e.g. nginx real_ip) — the throttle keys on
     # REMOTE_ADDR.
     "PREVIEW_RATE_LIMIT": 30,
+    # Jetstream endpoint for the live cache-invalidation consumer
+    # (`manage.py atproto jetstream`, requires the `jetstream` extra).
+    "JETSTREAM_URL": "wss://jetstream2.us-east.bsky.network/subscribe",
     # ATProto OAuth client (requires the `oauth` extra:
     # `pip install django-mosaic[oauth]`). Lets visitors sign in with their
     # own ATProto account — the building block for site claiming and any

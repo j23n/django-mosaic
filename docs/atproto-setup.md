@@ -376,6 +376,7 @@ Defaults are taken from `conf.py` (`DEFAULTS`) and the lexicon/reaction modules.
 | `PREVIEW_LANDING` | `False` | Serve a landing page (handle form + waitlist signup) at the site root, turning the instance into a dedicated preview service. Requires `PREVIEW`. Route is built at startup — restart after changing. |
 | `PREVIEW_RATE_LIMIT` | `30` | Max preview loads per client IP per minute (in-app, cache-based; `0` disables). Keys on `REMOTE_ADDR` — behind a proxy, configure real-IP forwarding (e.g. nginx `real_ip`). |
 | `OAUTH_CLIENT` | `{...}` (inert) | ATProto OAuth client config; see [Sign in with ATProto](#sign-in-with-atproto-oauth). Sub-keys: `BASE_URL` (**required** to enable), `PRIVATE_KEY` (**required**; PEM ES256 key), `KEY_ID` (`"mosaic-oauth-1"`), `SCOPE` (`"atproto transition:generic"`). |
+| `JETSTREAM_URL` | `"wss://jetstream2.us-east.bsky.network/subscribe"` | Jetstream endpoint for `manage.py atproto jetstream` — a long-running consumer (requires the `jetstream` extra) that invalidates read caches the moment a watched account writes to its repo. Optional; without it caches simply expire on their TTLs. |
 | `APPVIEW_URL` | `"https://public.api.bsky.app"` | Override the Bluesky AppView used for `getPostThread`. Rarely needed. |
 | `CONSTELLATION_URL` | `"https://constellation.microcosm.blue"` | Override the Constellation backlink index. Rarely needed (e.g. self-hosted). |
 

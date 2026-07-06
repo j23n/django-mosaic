@@ -58,6 +58,14 @@ class Command(BaseCommand):
             help="Generate an ES256 private key for OAUTH_CLIENT['PRIVATE_KEY']",
         )
 
+        jetstream = sub.add_parser(
+            "jetstream",
+            help="Run the Jetstream consumer (live cache invalidation)",
+        )
+        jetstream.add_argument(
+            "--url", default=None, help="Override the Jetstream endpoint"
+        )
+
     def handle(self, *args, **options):
         command = options["command"]
         if command == "status":
@@ -68,6 +76,8 @@ class Command(BaseCommand):
             return self._check(options["post"])
         if command == "oauth-key":
             return self._oauth_key()
+        if command == "jetstream":
+            return self._jetstream(options.get("url"))
 
         if not conf.enabled():
             raise CommandError(
@@ -122,6 +132,30 @@ class Command(BaseCommand):
                 "The OAuth dependencies are missing — install django-mosaic[oauth]."
             ) from exc
         self.stdout.write(generate_private_key_pem())
+
+    def _jetstream(self, url):
+        """Run the Jetstream consumer until interrupted."""
+        import asyncio
+
+        try:
+            import websockets  # noqa: F401
+        except ImportError as exc:
+            raise CommandError(
+                "The Jetstream dependencies are missing — install "
+                "django-mosaic[jetstream]."
+            ) from exc
+        from django_mosaic.atproto import jetstream
+
+        dids = jetstream.wanted_dids()
+        if not dids:
+            raise CommandError(
+                "No DIDs to watch — configure MOSAIC_ATPROTO or add tenants."
+            )
+        self.stdout.write(f"Watching {len(dids)} DID(s) via {url or 'default'}...")
+        try:
+            asyncio.run(jetstream.consume(url))
+        except KeyboardInterrupt:
+            self.stdout.write("Stopped.")
 
     def _status(self):
         self.stdout.write(f"Configured: {conf.enabled()}")

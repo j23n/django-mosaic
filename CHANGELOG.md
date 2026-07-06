@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom CSS tier for hosted tenants: a dashboard stylesheet textarea
   stored in the settings record and served standalone at `/custom.css`
   (`text/css` + `nosniff`, never inlined into HTML).
+- Jetstream consumer (`manage.py atproto jetstream`, new `jetstream`
+  extra): one websocket watching the owner plus all active tenants,
+  invalidating the relevant read caches the moment an account writes to
+  its repo. Cursor-resumed across restarts; purely an optimization over
+  the TTL caches.
 
 ### Changed
 - All ATProto read paths (lexicon pages, blob URLs, record partials) now take
