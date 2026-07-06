@@ -1,7 +1,78 @@
 # Mosaic on ATProto — Design Notes
 
-*Status: exploration / design discussion. Nothing here is implemented.*
+*Status: living design doc. The bridge, reactions, and lexicon pages described
+below are now implemented; the sections marked "future" are not.*
 *Research snapshot: 2026-07-03. The protocol is moving fast — re-verify before building.*
+
+## Repositioning (2026-07): mosaic as your home in the ATmosphere
+
+Mosaic's identity shifts from "a blog engine with an ATProto bridge" to **an
+information aggregation system: a personal AppView of your PDS, rendered as
+your own website.** All of your ATmosphere content — posts, photos, repos,
+books, scrobbles, events — lives in one place, presented as you see fit,
+instead of scattered across leaflet.pub, bsky.app, tangled.org, and friends.
+Many tiles, one picture; the name finally earns itself.
+
+What changes when aggregation is the identity rather than a feature:
+
+- **The unified timeline becomes the home page** — a merge across all
+  configured collections (TID rkeys make this a k-way sorted merge), with
+  per-collection sections as secondary navigation. The blog is one collection
+  among many; it stays special only because it's authored here.
+- **The Jetstream listener graduates from nice-to-have to core.** An
+  aggregator that's a cache-TTL stale feels broken in a way a blog doesn't.
+  A `manage.py atproto listen` daemon (wantedDids=you) invalidates collection
+  caches on your own writes; Spacedust adds instant inbound-reaction updates
+  and is the foundation for notifications. Ship as optional so the
+  daemon-less deployment keeps working.
+- **The template-per-NSID registry is the theming system** and the main
+  extension point. Presentation sovereignty is the product.
+- **Your domain is your identity** (domain-as-handle + verification,
+  already built). For *presenting* your content, this site is canonical —
+  standard.site's verification model formalizes exactly that. For
+  *interacting* (replying to a reply), we still link out until mosaic grows
+  write-actions via OAuth; that's the later step from "personal AppView" to
+  "personal client".
+- Differentiators vs. prior art (at-home, blento — static/JS): self-hosted
+  server rendering, a real private layer, deployment automation, IndieWeb
+  dual citizenship.
+
+### Private content under the new positioning
+
+Authoring stays in-house (martor) because of the private namespace — and the
+private layer gets an upgrade path instead of a protocol hack:
+
+1. **Now (default): encrypted-at-rest on the server, JS decryption client.**
+   Private posts stay in Django (off-protocol, per the official guidance),
+   optionally encrypted so the server itself can't read them: serve
+   ciphertext + a small WebCrypto (AES-256-GCM) decryptor; the key travels in
+   the **URL fragment** (`/private/2026/trip#<key>`), which never reaches any
+   server, log, PDS, or firehose. This generalizes mosaic's secret-link model
+   into capability links, gives the "enter a password / click a link,
+   decrypts in the browser" UX, and keeps instant revocation (delete the
+   row). Prior art for the JS pattern: staticrypt / Portable Secret.
+2. **Opt-in (eyes open): ciphertext mirror in the PDS for portability.**
+   A custom lexicon (`…mosaic.encryptedDocument`: ciphertext, nonce, alg —
+   NOT an encrypted site.standard.document, whose required fields would leak
+   titles/semantics). Understand what this does NOT give you: records in a
+   public repo **always transit the firehose** and are archived by third
+   parties forever — there is no unlisted record, which is why proposal 0016
+   builds a separate no-firehose protocol. With random 256-bit keys in URL
+   fragments (never password-derived keys, which are offline-brute-forceable
+   from archives forever), the harvest-now-decrypt-later risk reduces to
+   breaking AES — but metadata (existence, count, timestamps, sizes) still
+   leaks, revocation of already-shared links is impossible, and images must
+   be encrypted before uploadBlob or they leak by CID. Suitable for
+   "rather-not-public", never for "damaging-in-15-years". Note: Leaflet's
+   editor can't be piggybacked for this — it writes plaintext records with
+   no encryption hook; encryption happens in mosaic at publish time.
+3. **Later (the migration path): permissioned data (proposal 0016).** When
+   spaces ship, private posts move into a space (com.atproto.simplespace
+   member lists), mosaic's private namespace becomes a space viewer, magic
+   links become space credentials, and the JS crypto layer retires or stays
+   as optional E2EE on top — 0016 is access control, not confidentiality.
+   Keeping Django as the plaintext source of truth throughout makes this
+   migration a re-publish, not a data rescue.
 
 ## The core reframe
 
