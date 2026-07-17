@@ -96,9 +96,8 @@ class ContentImage(models.Model):
     def save(self, *args, **kwargs):
         # Process the image on creation or whenever a new file is uploaded.
         if self.image and self._image_changed():
+            random_name = secrets.token_hex(32)
             try:
-                random_name = secrets.token_hex(32)
-
                 img = Image.open(self.image.file)
                 # Fix orientation based on EXIF data
                 img = ImageOps.exif_transpose(img)
@@ -128,6 +127,15 @@ class ContentImage(models.Model):
                 )
             except (OSError, ValueError, Image.DecompressionBombError) as e:
                 logger.warning(f"Failed to process image: {e}")
+                # Processing failed, but we must not persist the raw upload
+                # under its user-supplied name/extension (e.g. "x.html"), which
+                # the media server would then serve as active content. Re-store
+                # the bytes under a random name with an image extension so it
+                # can only ever be served as a (here, broken) image — never as
+                # HTML/SVG/JS.
+                self.image.file.seek(0)
+                raw = self.image.file.read()
+                self.image.save(f"{random_name}.jpg", ContentFile(raw), save=False)
 
         super().save(*args, **kwargs)
 
@@ -253,9 +261,16 @@ class Post(models.Model):
 
     def get_absolute_url(self):
         if self.is_published:
+            # post_detail filters on published_at__year, which Django evaluates
+            # in the active timezone when USE_TZ is on. Build the year the same
+            # way, or a post near a UTC/local year boundary gets a permalink
+            # that 404s against its own lookup.
+            published = self.published_at
+            if settings.USE_TZ:
+                published = django.utils.timezone.localtime(published)
             return reverse(
                 "post-detail",
-                args=[self.namespace.name, self.published_at.year, self.slug],
+                args=[self.namespace.name, published.year, self.slug],
             )
         else:
             return reverse("draft-detail", args=[self.namespace.name, self.secret_id])

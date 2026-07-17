@@ -6,7 +6,9 @@ This is the M0 groundwork for multi-tenant hosting: request handlers decide
 whose repo is being rendered; nothing below them reads global settings.
 """
 
+import hashlib
 import logging
+import re
 from dataclasses import dataclass
 
 from django.core.cache import cache
@@ -17,6 +19,19 @@ from .client import resolve_identity, resolve_pds
 logger = logging.getLogger("django_mosaic.atproto")
 
 IDENTITY_CACHE_SECONDS = 3600
+
+# A handle arrives from the /@<handle> URL, so it can contain spaces or control
+# characters that some cache backends (memcached) reject as keys. Use it
+# verbatim only when it is a safe, bounded token; otherwise hash it.
+_SAFE_HANDLE_KEY = re.compile(r"^[a-z0-9.\-]{1,200}$")
+
+
+def _identity_cache_key(handle):
+    normalized = handle.lower()
+    if _SAFE_HANDLE_KEY.match(normalized):
+        return f"mosaic_atproto:identity:{normalized}"
+    digest = hashlib.sha256(handle.encode("utf-8")).hexdigest()[:32]
+    return f"mosaic_atproto:identity:h:{digest}"
 
 
 @dataclass(frozen=True)
@@ -31,7 +46,7 @@ def resolve(handle):
 
     Raises AtprotoError on failure (callers on the render path catch it).
     """
-    cache_key = f"mosaic_atproto:identity:{handle}"
+    cache_key = _identity_cache_key(handle)
     cached = cache.get(cache_key)
     if cached:
         return cached

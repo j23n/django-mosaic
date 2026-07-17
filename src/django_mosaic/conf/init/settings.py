@@ -249,10 +249,6 @@ MARKDOWNIFY = {
 
 
 # Security hardening (active when DEBUG is off).
-# nginx terminates TLS and forwards X-Forwarded-Proto, so Django must trust it
-# to build https:// absolute URLs (canonical tags, og:url, sitemap).
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
@@ -261,6 +257,33 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    # nginx terminates TLS and forwards X-Forwarded-Proto, so Django trusts it
+    # to build https:// absolute URLs (canonical tags, og:url, sitemap). Only
+    # set this behind a proxy that *always* sets the header — never in DEBUG /
+    # local runserver, where a client could spoof it.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+
+# Caching. Defaults to a per-process in-memory cache, which is fine for a
+# single-process dev server but means ATProto read caches, rate-limit
+# throttles, and the Jetstream consumer's invalidations do NOT reach other
+# processes. For any multi-process deployment — and required for the
+# `manage.py atproto jetstream` daemon to invalidate the web workers' caches —
+# point REDIS_URL at a shared Redis (e.g. redis://127.0.0.1:6379/0).
+_redis_url = os.environ.get("REDIS_URL", "")
+if _redis_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _redis_url,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
 
 
 # Logging Configuration

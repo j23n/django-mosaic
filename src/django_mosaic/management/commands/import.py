@@ -4,6 +4,7 @@ from pathlib import Path
 import yaml
 from dateutil import parser as date_parser
 from django.core.management.base import BaseCommand, CommandError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from django_mosaic.models import Author, Namespace, Post, Tag
@@ -84,30 +85,41 @@ class Command(BaseCommand):
 
                 slug = header.get("slug", "")
 
-                tag_names = _as_tag_list(header.get("tags"))
-                tag_names += _as_tag_list(header.get("categories"))
-                tags = [
-                    Tag.objects.get_or_create(name=name, namespace=ns)[0]
-                    for name in tag_names
-                ]
-
                 published_at = date_parser.parse(str(header["date"]))
                 if timezone.is_naive(published_at):
                     published_at = timezone.make_aware(published_at)
 
-                post = Post(
-                    author=author,
-                    title=header["title"],
-                    is_published=not header["draft"],
-                    published_at=published_at,
-                    slug=slug,
-                    namespace=ns,
-                    summary=header.get("description", ""),
-                    content=content,
-                )
-                post.save()
-                if tags:
-                    post.tags.add(*tags)
-                logger.info(f"Created post {post} with tags {tags}")
-            except (ValueError, OSError, yaml.YAMLError) as e:
+                # Re-importing the same source should update the post, not
+                # create a duplicate: key on (namespace, slug) when a slug is
+                # given, else (namespace, title). Wrap each file so one bad row
+                # (e.g. an IntegrityError) doesn't abort the whole batch.
+                lookup = {"namespace": ns}
+                if slug:
+                    lookup["slug"] = slug
+                else:
+                    lookup["title"] = header["title"]
+                fields = {
+                    "author": author,
+                    "title": header["title"],
+                    "is_published": not header["draft"],
+                    "published_at": published_at,
+                    "summary": header.get("description", ""),
+                    "content": content,
+                }
+
+                tag_names = _as_tag_list(header.get("tags"))
+                tag_names += _as_tag_list(header.get("categories"))
+
+                with transaction.atomic():
+                    tags = [
+                        Tag.objects.get_or_create(name=name, namespace=ns)[0]
+                        for name in tag_names
+                    ]
+                    post, created = Post.objects.update_or_create(
+                        defaults=fields, **lookup
+                    )
+                    post.tags.set(tags)
+                verb = "Created" if created else "Updated"
+                logger.info(f"{verb} post {post} with tags {tags}")
+            except (ValueError, OSError, yaml.YAMLError, IntegrityError) as e:
                 logger.error(f"Could not import {file}: {e}", exc_info=True)

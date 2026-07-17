@@ -225,9 +225,10 @@ def start_auth(request, handle):
         "handle": identity.handle,
         "pds_url": identity.pds_url,
     }
-    query = urlencode(
-        {"client_id": metadata.client_id(), "request_uri": par["request_uri"]}
-    )
+    request_uri = par.get("request_uri")
+    if not request_uri:
+        raise OAuthError("PAR response did not include a request_uri.")
+    query = urlencode({"client_id": metadata.client_id(), "request_uri": request_uri})
     return f"{server['authorization_endpoint']}?{query}"
 
 
@@ -282,6 +283,27 @@ def complete_auth(request):
             f"{pending['did']!r}."
         )
 
+    # A hostile/buggy AS could return a Bearer token or a down-scoped grant;
+    # the spec requires the client to verify both before trusting the session.
+    access_token = tokens.get("access_token")
+    if not access_token:
+        raise OAuthError("Token response did not include an access_token.")
+    token_type = (tokens.get("token_type") or "").lower()
+    if token_type and token_type != "dpop":
+        raise OAuthError(
+            f"Unexpected token_type {tokens.get('token_type')!r}; expected DPoP."
+        )
+    requested_scope = conf.oauth_client()["SCOPE"]
+    granted_scope = tokens.get("scope", "")
+    if granted_scope:
+        granted = set(granted_scope.split())
+        missing = [s for s in requested_scope.split() if s not in granted]
+        if missing:
+            raise OAuthError(
+                "Authorization server did not grant required scope(s): "
+                + " ".join(missing)
+            )
+
     session, _ = OAuthSession.objects.update_or_create(
         did=pending["did"],
         defaults={
@@ -289,13 +311,16 @@ def complete_auth(request):
             "pds_url": pending["pds_url"],
             "auth_server": pending["issuer"],
             "token_endpoint": pending["token_endpoint"],
-            "access_token": tokens["access_token"],
+            "access_token": access_token,
             "refresh_token": tokens.get("refresh_token", ""),
-            "scope": tokens.get("scope", conf.oauth_client()["SCOPE"]),
+            "scope": granted_scope or requested_scope,
             "dpop_jwk": pending["dpop_jwk"],
             "access_token_expires_at": _expiry(tokens),
         },
     )
+    # Rotate the session key on sign-in so a fixated pre-auth session cookie
+    # can't ride the login into an authenticated one (session fixation).
+    request.session.cycle_key()
     request.session[DID_KEY] = session.did
     return session
 
@@ -304,7 +329,13 @@ def _expiry(tokens):
     expires_in = tokens.get("expires_in")
     if not expires_in:
         return None
-    return timezone.now() + timedelta(seconds=int(expires_in))
+    try:
+        seconds = int(expires_in)
+    except (TypeError, ValueError):
+        # A non-numeric expires_in from a broken AS shouldn't 500 the login;
+        # treat it as unknown expiry (refresh will kick in on the first 401).
+        return None
+    return timezone.now() + timedelta(seconds=seconds)
 
 
 def refresh(session):

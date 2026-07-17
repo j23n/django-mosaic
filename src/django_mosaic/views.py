@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from reversion.models import Version
@@ -77,20 +78,28 @@ def post_detail(request, namespace, year, post_slug):
     )
     post.content = post.published_content
 
+    # Order by (published_at, id) so posts sharing a published_at still have a
+    # stable neighbour instead of skipping each other, and pull the namespace
+    # for the template's get_absolute_url without an extra query each.
+    siblings = Post.objects.filter(
+        namespace=post.namespace, is_published=True
+    ).select_related("namespace")
     next_post = (
-        Post.objects.filter(
-            namespace=post.namespace,
-            is_published=True,
-            published_at__gt=post.published_at,
+        siblings.filter(
+            Q(published_at__gt=post.published_at)
+            | Q(published_at=post.published_at, id__gt=post.id)
         )
-        .reverse()
+        .order_by("published_at", "id")
         .first()
     )
-    prev_post = Post.objects.filter(
-        namespace=post.namespace,
-        is_published=True,
-        published_at__lt=post.published_at,
-    ).first()
+    prev_post = (
+        siblings.filter(
+            Q(published_at__lt=post.published_at)
+            | Q(published_at=post.published_at, id__lt=post.id)
+        )
+        .order_by("-published_at", "-id")
+        .first()
+    )
 
     return render(
         request,

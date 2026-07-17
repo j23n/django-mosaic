@@ -30,7 +30,15 @@ DEFAULT_URL = "wss://jetstream2.us-east.bsky.network/subscribe"
 # Persist the last seen cursor (time_us) so a restart resumes without a gap;
 # Jetstream replays from a cursor up to ~72h back.
 CURSOR_CACHE_KEY = "mosaic_atproto:jetstream:cursor"
-CURSOR_SAVE_EVERY = 100
+# Persist the cursor at most this often while streaming (plus a final flush
+# whenever a connection ends). Time-based, not per-N-events: a single-owner
+# blog may see only a handful of events a day, so an every-100-events cadence
+# would leave the cursor weeks stale and defeat gap-free resume.
+CURSOR_SAVE_SECONDS = 30
+# A connection must last at least this long (or deliver a message) to count as
+# healthy and reset the reconnect backoff — so a bouncing endpoint that accepts
+# and immediately closes keeps backing off instead of hot-looping.
+CONNECTION_STABLE_SECONDS = 5
 
 # The record-list limits our read paths actually cache under: preview
 # sections and full lexicon pages. Kept in sync with the read paths by
@@ -44,23 +52,29 @@ def jetstream_url():
 
 def wanted_dids():
     """The DIDs whose writes we care about: owner + active hosted tenants."""
+    from django.apps import apps
+
     dids = []
     try:
         owner = identity_mod.owner()
         if owner:
             dids.append(owner.did)
-    except Exception:  # noqa: BLE001 - unconfigured owner is fine
-        pass
-    try:
+    except Exception as e:  # noqa: BLE001 - unconfigured/unresolvable owner is fine
+        logger.debug("jetstream: no owner DID (%s)", e)
+    # Only query tenants when the hosted app is actually installed, so a real
+    # database outage surfaces as a warning instead of being swallowed as if
+    # hosting simply weren't enabled.
+    if apps.is_installed("django_mosaic.hosted"):
         from django_mosaic.hosted.models import Tenant
 
-        dids += list(
-            Tenant.objects.filter(status=Tenant.STATUS_ACTIVE).values_list(
-                "did", flat=True
+        try:
+            dids += list(
+                Tenant.objects.filter(status=Tenant.STATUS_ACTIVE).values_list(
+                    "did", flat=True
+                )
             )
-        )
-    except Exception:  # noqa: BLE001 - hosted app not installed
-        pass
+        except Exception as e:  # noqa: BLE001 - degrade, but do not hide it
+            logger.warning("jetstream: could not load tenant DIDs: %s", e)
     # Preserve order, drop dupes; Jetstream caps wantedDids at 10 000.
     return list(dict.fromkeys(dids))[:10_000]
 
@@ -139,6 +153,7 @@ async def consume(url=None, reconnect_delay_max=60):
     periodic reconnect if you need them sooner.
     """
     import asyncio
+    import time
 
     import websockets
     from asgiref.sync import sync_to_async
@@ -160,22 +175,37 @@ async def consume(url=None, reconnect_delay_max=60):
             delay = min(delay * 2, reconnect_delay_max)
             continue
         full_url = build_url(dids, url, await aget_cursor())
+        last_cursor = None
+        connected_at = None
+        got_message = False
         try:
             async with websockets.connect(full_url) as socket:
                 logger.info("jetstream: connected (%d dids)", len(dids))
-                seen = 0
+                connected_at = time.monotonic()
+                last_save = connected_at
                 async for message in socket:
-                    delay = 1  # a live message proves the connection works
+                    got_message = True
                     event_cursor = await ahandle_event(message)
-                    seen += 1
-                    if event_cursor and seen % CURSOR_SAVE_EVERY == 0:
-                        await aset_cursor(event_cursor)
-            # A clean close (server restart/deploy) still backs off, so we
-            # never hot-loop reconnects against a bouncing endpoint.
-            logger.info("jetstream: connection closed; reconnecting in %ds", delay)
+                    if event_cursor:
+                        last_cursor = event_cursor
+                        now = time.monotonic()
+                        if now - last_save >= CURSOR_SAVE_SECONDS:
+                            await aset_cursor(last_cursor)
+                            last_save = now
+            logger.info("jetstream: connection closed; reconnecting")
         except asyncio.CancelledError:
             raise
         except Exception as e:  # noqa: BLE001 - reconnect on any failure
-            logger.warning("jetstream: connection lost (%s); retrying in %ds", e, delay)
+            logger.warning("jetstream: connection lost (%s)", e)
+        # Flush the newest cursor so a restart resumes from the real position,
+        # not from up to CURSOR_SAVE_SECONDS ago.
+        if last_cursor:
+            await aset_cursor(last_cursor)
+        # Reset the backoff only after a connection that actually worked;
+        # otherwise keep doubling so a bouncing endpoint doesn't hot-loop.
+        healthy = got_message or (
+            connected_at is not None
+            and time.monotonic() - connected_at >= CONNECTION_STABLE_SECONDS
+        )
+        delay = 1 if healthy else min(delay * 2, reconnect_delay_max)
         await asyncio.sleep(delay)
-        delay = min(delay * 2, reconnect_delay_max)

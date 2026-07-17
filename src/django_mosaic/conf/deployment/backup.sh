@@ -7,6 +7,19 @@ set -e
 BACKUP_DIR="{{INSTALL_PATH}}/backups"
 DB_FILE="{{INSTALL_PATH}}/db.sqlite3"
 
+# Take a consistent snapshot. A plain `cp` of a live SQLite file can capture a
+# torn database if a write is in flight (and misses the -wal/-shm files);
+# sqlite3's ".backup" respects locking/WAL. Fall back to cp only if the sqlite3
+# CLI isn't installed.
+snapshot() {
+    local dest="$1"
+    if command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 "$DB_FILE" ".backup '$dest'"
+    else
+        cp "$DB_FILE" "$dest"
+    fi
+}
+
 # Create backup directories
 mkdir -p "$BACKUP_DIR"/{hourly,daily,weekly,monthly}
 
@@ -16,22 +29,22 @@ WEEKSTAMP=$(date +%Y-W%V)
 MONTHSTAMP=$(date +%Y-%m)
 
 # Create hourly backup
-cp "$DB_FILE" "$BACKUP_DIR/hourly/db-$TIMESTAMP.sqlite3"
+snapshot "$BACKUP_DIR/hourly/db-$TIMESTAMP.sqlite3"
 
 # Rotate hourly backups
 # If it's the first backup of the day (midnight hour), promote to daily
 if [ "$(date +%H)" = "00" ]; then
-    cp "$DB_FILE" "$BACKUP_DIR/daily/db-$DATESTAMP.sqlite3"
+    snapshot "$BACKUP_DIR/daily/db-$DATESTAMP.sqlite3"
 fi
 
 # If it's Monday midnight, promote to weekly
 if [ "$(date +%u)" = "1" ] && [ "$(date +%H)" = "00" ]; then
-    cp "$DB_FILE" "$BACKUP_DIR/weekly/db-$WEEKSTAMP.sqlite3"
+    snapshot "$BACKUP_DIR/weekly/db-$WEEKSTAMP.sqlite3"
 fi
 
 # If it's the 1st of the month at midnight, promote to monthly
 if [ "$(date +%d)" = "01" ] && [ "$(date +%H)" = "00" ]; then
-    cp "$DB_FILE" "$BACKUP_DIR/monthly/db-$MONTHSTAMP.sqlite3"
+    snapshot "$BACKUP_DIR/monthly/db-$MONTHSTAMP.sqlite3"
 fi
 
 # Cleanup old backups

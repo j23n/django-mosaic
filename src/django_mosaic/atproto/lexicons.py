@@ -18,6 +18,7 @@ and read-only previews of any handle.
 """
 
 import logging
+from urllib.parse import urlencode
 
 from django.core.cache import cache
 
@@ -159,7 +160,10 @@ def list_records(collection, identity=None, limit=MAX_RECORDS):
                 break
     except Exception as e:  # noqa: BLE001 - a PDS outage must not 500 the site
         logger.warning(f"listRecords failed for {collection}: {e}")
-        return []
+        # Return whatever full pages we already fetched rather than dropping a
+        # populated collection to "empty" on a mid-pagination failure. Don't
+        # cache a partial result.
+        return records
 
     cache.set(cache_key, records, LIST_CACHE_SECONDS)
     return records
@@ -176,4 +180,7 @@ def blob_url(blob, identity=None):
     target = _target(identity)
     if target is None:
         return ""
-    return f"{target.pds_url}/xrpc/com.atproto.sync.getBlob?did={target.did}&cid={cid}"
+    # safe=":" keeps DID colons readable; the point is to escape a hostile cid
+    # containing & or # so it can't inject extra query parameters.
+    query = urlencode({"did": target.did, "cid": cid}, safe=":")
+    return f"{target.pds_url}/xrpc/com.atproto.sync.getBlob?{query}"

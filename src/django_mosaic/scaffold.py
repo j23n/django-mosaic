@@ -81,6 +81,28 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 application = get_asgi_application()
 '''
 
+# The deployment Dockerfile installs the project's dependencies from this file,
+# so a scaffolded project must ship one or `mosaic deployment setup` fails at
+# `docker build`.
+PYPROJECT_TOML = """[project]
+name = "{name}"
+version = "0.1.0"
+description = "A mosaic-powered site."
+requires-python = ">=3.12"
+dependencies = [
+    # The mosaic package this project is built on. Adjust the source to match
+    # your deployment (a PyPI release, a git URL, or a local path).
+    "django-mosaic",
+]
+"""
+
+
+def _project_name(target):
+    """A PEP 503-ish package name derived from the target directory name."""
+    name = "".join(c if c.isalnum() else "-" for c in target.name.lower())
+    name = name.strip("-")
+    return name or "mosaic-site"
+
 
 def _write(path, content, force):
     if path.exists() and not force:
@@ -101,6 +123,11 @@ def init(target, force=False):
     _write(target / "wsgi.py", WSGI_PY, force)
     _write(target / "asgi.py", ASGI_PY, force)
     _write(target / "settings.py", (CONF / "settings.py").read_text(), force)
+    _write(
+        target / "pyproject.toml",
+        PYPROJECT_TOML.format(name=_project_name(target)),
+        force,
+    )
 
     env_src = CONF / ".env.local"
     if env_src.exists():

@@ -28,7 +28,7 @@ from pathlib import Path
 from django.core.management.utils import get_random_secret_key
 from fabric import Connection
 
-from .config_manager import (
+from ._config_manager import (
     DEFAULT_APP_NAME,
     DEFAULT_INSTALL_PATH,
     ConfigManager,
@@ -59,6 +59,14 @@ SHELL_SAFE_PATTERNS = {
     "email": re.compile(r"^[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,63}$"),
     "app_name": re.compile(r"^[A-Za-z0-9._-]{1,64}$"),
     "install_path": re.compile(r"^/[A-Za-z0-9._/-]{1,255}$"),
+    # ssh_key is interpolated into `ssh -i {path}`; wsgi_module / url_conf /
+    # gunicorn_workers into the Dockerfile CMD and templates. Validate them too
+    # so a hand-edited .deployment-config.toml can't inject flags or break out
+    # of the command (e.g. "key -oProxyCommand=...").
+    "ssh_key": re.compile(r"^[A-Za-z0-9._~/-]{1,255}$"),
+    "wsgi_module": re.compile(r"^[A-Za-z0-9_.:]{1,128}$"),
+    "url_conf": re.compile(r"^[A-Za-z0-9_.]{1,128}$"),
+    "gunicorn_workers": re.compile(r"^[0-9]{1,3}$"),
 }
 
 
@@ -75,6 +83,15 @@ class DeploymentHandler:
         """
         self.stdout = stdout
         self.style = style
+
+    @staticmethod
+    def _cli_overrides(options):
+        """CLI flags that should override saved config (None values ignored)."""
+        return {
+            key: options.get(key)
+            for key in ("host", "user", "domain")
+            if options.get(key) is not None
+        }
 
     # =========================================================================
     # UTILITIES
@@ -247,7 +264,9 @@ class DeploymentHandler:
 
         try:
             # Step 1: Gather configuration
-            config = config_manager.get_config(stdout=None)
+            config = config_manager.get_config(
+                cli_args=self._cli_overrides(options), stdout=None
+            )
             self.validate_config(config)
 
             # Store config as instance variable for use in helper methods
@@ -378,7 +397,9 @@ class DeploymentHandler:
 
         try:
             # Load config from file (no interactive prompts for fields already saved)
-            config = config_manager.get_config(stdout=None)
+            config = config_manager.get_config(
+                cli_args=self._cli_overrides(options), stdout=None
+            )
             self.validate_config(config)
             self.config = config
 
@@ -893,7 +914,11 @@ class DeploymentHandler:
             "app_name",
             "domain",
         ]
-        config = config_manager.get_config(required_fields=required_fields, stdout=None)
+        config = config_manager.get_config(
+            cli_args=self._cli_overrides(options),
+            required_fields=required_fields,
+            stdout=None,
+        )
         self.validate_config(config)
 
         # Store config as instance variable for use in helper methods

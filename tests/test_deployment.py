@@ -19,12 +19,12 @@ import pytest
 # the whole module cleanly when it isn't installed rather than error at import.
 pytest.importorskip("fabric")
 
+from django_mosaic.management.commands._config_manager import (  # noqa: E402
+    ConfigManager,
+)
 from django_mosaic.management.commands._deployment import (  # noqa: E402
     SHELL_SAFE_PATTERNS,
     DeploymentHandler,
-)
-from django_mosaic.management.commands.config_manager import (  # noqa: E402
-    ConfigManager,
 )
 
 
@@ -151,6 +151,33 @@ class TestValidateConfigSecurity:
         config["install_path"] = install_path
         with pytest.raises(ValueError):
             handler.validate_config(config)
+
+    @pytest.mark.parametrize(
+        "ssh_key",
+        [
+            "~/.ssh/key -oProxyCommand=evil",  # flag injection into `ssh -i`
+            "~/.ssh/id rsa",  # a space breaks the argument
+            "~/.ssh/`id`",
+            "~/.ssh/key;id",
+        ],
+    )
+    def test_ssh_key_with_injection_rejected(self, ssh_key):
+        handler = make_handler()
+        config = clean_config()
+        config["ssh_key"] = ssh_key
+        with pytest.raises(ValueError):
+            handler.validate_config(config)
+
+    def test_wsgi_module_and_workers_validated(self):
+        handler = make_handler()
+        bad = clean_config()
+        bad["wsgi_module"] = 'wsgi:app"]}\ninjected'
+        with pytest.raises(ValueError):
+            handler.validate_config(bad)
+        bad2 = clean_config()
+        bad2["gunicorn_workers"] = "2; rm -rf /"
+        with pytest.raises(ValueError):
+            handler.validate_config(bad2)
 
     def test_error_message_names_offending_field(self):
         handler = make_handler()

@@ -115,6 +115,98 @@ class ContentImageProcessingTest(TestCase):
         self.assertTrue(ci.thumb)
         self.assertTrue(ci.thumb.name.endswith("_thumb.jpg"))
 
+    def test_unprocessable_upload_is_not_stored_as_active_content(self):
+        # An undecodable payload with an executable name must never be persisted
+        # under that name (it would be served as HTML/SVG from the media origin).
+        bad = SimpleUploadedFile(
+            "x.html", b"<script>alert(1)</script>", content_type="image/png"
+        )
+        ci = ContentImage.objects.create(post=self.post, image=bad, alt="x")
+        self.assertTrue(ci.image.name.endswith(".jpg"))
+        self.assertNotIn(".html", ci.image.name)
+
+
+class UploadEndpointTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.ns = Namespace.objects.create(name="public")
+        cls.user = User.objects.create_superuser("up", "u@b.com", "pass")
+        cls.author = Author.objects.create(user=cls.user)
+
+    def setUp(self):
+        self.client.force_login(self.user)
+
+    def _png(self):
+        buf = io.BytesIO()
+        Image.new("RGB", (10, 10), color=(1, 2, 3)).save(buf, format="PNG")
+        buf.seek(0)
+        return SimpleUploadedFile("a.png", buf.read(), content_type="image/png")
+
+    def test_non_numeric_post_id_does_not_500(self):
+        # A non-numeric post_id used to raise ValueError from the pk lookup.
+        resp = self.client.post(
+            "/admin/django_mosaic/post/upload-image/",
+            {"markdown-image-upload": self._png(), "post_id": "not-a-number"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["status"], 200)
+
+
+class ConstantsDefaultTest(TestCase):
+    def test_empty_constants_gets_defaulted_site(self):
+        from django.test import override_settings
+
+        from django_mosaic.context_processors import site_constants
+
+        # A consumer that never defined CONSTANTS["site"] must not crash feeds
+        # or the context processor.
+        with override_settings(CONSTANTS={}):
+            data = site_constants()
+        self.assertEqual(data["site"]["title"], "")
+        self.assertEqual(data["site"]["description"], "")
+
+    def test_provided_title_passes_through_with_defaulted_description(self):
+        from django.test import override_settings
+
+        from django_mosaic.context_processors import site_constants
+
+        with override_settings(CONSTANTS={"site": {"title": "My Site"}}):
+            data = site_constants()
+        self.assertEqual(data["site"]["title"], "My Site")
+        self.assertEqual(data["site"]["description"], "")
+
+
+class ImportIdempotencyTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.ns = Namespace.objects.create(name="public")
+        user = User.objects.create_user("importer")
+        cls.author = Author.objects.create(user=user)
+
+    def _write_post(self, tmp, slug="hello"):
+        (tmp / "p.md").write_text(
+            "---\n"
+            "title: Hello\n"
+            "date: 2026-01-02\n"
+            "draft: false\n"
+            f"slug: {slug}\n"
+            "---\n"
+            "Body text\n"
+        )
+
+    def test_reimport_updates_instead_of_duplicating(self):
+        import tempfile
+        from pathlib import Path
+
+        from django.core.management import call_command
+
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            self._write_post(tmp)
+            call_command("import", str(tmp), "public")
+            call_command("import", str(tmp), "public")
+        self.assertEqual(Post.objects.filter(namespace=self.ns).count(), 1)
+
 
 class ViewScopingTest(TestCase):
     @classmethod

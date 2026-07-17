@@ -1,6 +1,6 @@
 [Unit]
 Description=Hourly backup of {{APP_NAME}} database
-Requires=mosaic-backup.service
+Requires={{APP_NAME}}-backup.service
 
 [Timer]
 # Run every hour on the hour

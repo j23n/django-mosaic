@@ -20,11 +20,18 @@ class ScaffoldTest(SimpleTestCase):
                 "urls.py",
                 "wsgi.py",
                 "asgi.py",
+                "pyproject.toml",
                 ".env",
                 "templates/includes/header.html",
                 "templates/includes/about.html",
             ):
                 self.assertTrue((root / name).exists(), f"missing {name}")
+
+            # The deploy Dockerfile installs from pyproject.toml, so it must
+            # exist and declare django-mosaic; and the deploy WSGI/URL defaults
+            # must match this flat layout (wsgi.py / urls.py at the root).
+            pyproject = (root / "pyproject.toml").read_text()
+            self.assertIn("django-mosaic", pyproject)
             self.assertTrue((root / "static").is_dir())
             self.assertTrue((root / "media").is_dir())
 

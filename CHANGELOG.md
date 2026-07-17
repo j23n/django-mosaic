@@ -123,6 +123,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and undoing the per-leg Django pin, and a checked-in `.python-version`
   overrode the interpreter, so every leg silently ran the same Python/Django.
   The matrix pins the interpreter with `--python` and runs with `--no-sync`.
+- Migrations: `secret_id` duplicates are regenerated *before* the unique
+  constraint is added (0004), and tag-slug backfill de-duplicates per namespace
+  (0009), so upgrading an install with existing rows no longer bricks on an
+  `IntegrityError`.
+- Post permalinks build the year from the active timezone (matching the
+  `published_at__year` lookup), so a post near a UTC/local year boundary no
+  longer 404s against its own URL under a non-UTC `TIME_ZONE`.
+- `settings.CONSTANTS["site"]` title/description now default to empty instead
+  of raising `AttributeError`/`KeyError`, so mosaic can be installed into an
+  existing project without the scaffold.
+- The sitemap derives its excluded namespaces from the auth registry, so a
+  second gated namespace (not just the literal `private`) stays out of it.
+- Prev/next post navigation breaks ties by id and preloads the namespace, so
+  posts sharing a `published_at` still link to each other without extra queries.
+- Uploaded images that fail processing are re-stored under a random `.jpg`
+  name instead of the user-supplied one, so an undecodable `x.html` payload
+  can't be served as active content; a non-numeric `post_id` no longer 500s.
+- `list_records` returns already-fetched pages on a mid-pagination failure
+  instead of dropping a populated collection to empty; blob URLs escape the
+  `cid`; the preview handle is sanitized before use as a cache key.
+- OAuth: the token response's `token_type` (must be DPoP) and granted `scope`
+  are verified; the session key is rotated on sign-in (anti session-fixation);
+  malformed token/PAR responses raise a clean error instead of 500.
+- Deployment tooling: `config_manager` is no longer exposed as a broken
+  management command; `--host/--user/--domain` flags are honoured; scaffolded
+  projects ship a `pyproject.toml` and the deploy WSGI/URLconf defaults match
+  the generated flat layout; `validate_config` also covers `ssh_key`,
+  `wsgi_module`, `url_conf`, and `gunicorn_workers`; DB backups use sqlite's
+  `.backup` (consistent snapshot) and the backup timer's `Requires=` respects
+  a custom `app_name`; the Dockerfile installs from `pyproject.toml`.
+- Scaffolded settings define `CACHES` (Redis via `REDIS_URL`, else locmem) and
+  only trust `X-Forwarded-Proto` when `DEBUG` is off, so the Jetstream consumer
+  and throttles work across processes and the proxy header can't be spoofed
+  locally.
+- Jetstream persists its cursor on a 30s cadence (plus a flush when a
+  connection ends) instead of every 100 events, resets its reconnect backoff
+  only after a connection proves healthy, and logs a real DB outage instead of
+  silently degrading to owner-only.
+- `manage.py import` is idempotent (re-import updates rather than duplicates)
+  and no longer aborts the whole batch on one row's `IntegrityError`.
 
 ## [0.2.0] - 2026-07-03
 

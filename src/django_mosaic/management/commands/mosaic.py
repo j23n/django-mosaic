@@ -29,14 +29,14 @@ class Command(BaseCommand):
         # Shared flags for setup and update
         def add_deploy_flags(parser):
             parser.add_argument("--host", help="VPS hostname or IP")
-            parser.add_argument(
-                "--user", default="root", help="SSH user (default: root)"
-            )
+            # default None (not "root") so an unset flag doesn't clobber a saved
+            # non-root user; the "root" fallback is applied by ConfigManager.
+            parser.add_argument("--user", default=None, help="SSH user (default: root)")
             parser.add_argument("--domain", help="Domain name for the blog")
             parser.add_argument(
                 "--auto",
                 action="store_true",
-                help="Run without confirmations (print commands only)",
+                help="Run without per-step confirmation prompts (executes everything)",
             )
             parser.add_argument(
                 "--explain",
@@ -68,7 +68,7 @@ class Command(BaseCommand):
             "status", help="Check deployment status"
         )
         status.add_argument("--host", help="VPS hostname or IP")
-        status.add_argument("--user", default="root", help="SSH user")
+        status.add_argument("--user", default=None, help="SSH user (default: root)")
 
     def handle(self, *args, **options):
         command = options.get("command")

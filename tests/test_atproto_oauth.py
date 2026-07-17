@@ -11,6 +11,9 @@ import pytest
 jwt = pytest.importorskip("jwt")
 pytest.importorskip("cryptography")
 
+from importlib import import_module  # noqa: E402
+
+from django.conf import settings  # noqa: E402
 from django.test import RequestFactory, TestCase, override_settings  # noqa: E402
 from django.urls import path  # noqa: E402
 from django.utils import timezone  # noqa: E402
@@ -73,7 +76,13 @@ def _fake_request(session=None, get_params=None, post_params=None):
         request = factory.post("/oauth/login", post_params)
     else:
         request = factory.get("/oauth/callback", get_params or {})
-    request.session = session if session is not None else {}
+    # Use a real SessionStore (not a bare dict) so session-fixation defenses
+    # like cycle_key() are actually exercised.
+    engine = import_module(settings.SESSION_ENGINE)
+    store = engine.SessionStore()
+    for key, value in (session or {}).items():
+        store[key] = value
+    request.session = store
     return request
 
 
@@ -417,6 +426,53 @@ class CompleteAuthTest(TestCase):
         )
         with self.assertRaisesRegex(flow.OAuthError, "access_denied"):
             flow.complete_auth(request)
+
+    def _callback(self):
+        return _fake_request(
+            session={flow.PENDING_KEY: _pending()},
+            get_params={"code": "c", "state": "state-123", "iss": ISSUER},
+        )
+
+    def test_non_dpop_token_type_rejected(self):
+        request = self._callback()
+        with mock.patch.object(flow, "requests") as m:
+            m.post.return_value = _resp({**TOKENS, "token_type": "Bearer"})
+            with self.assertRaisesRegex(flow.OAuthError, "token_type"):
+                flow.complete_auth(request)
+        self.assertEqual(OAuthSession.objects.count(), 0)
+
+    def test_downscoped_grant_rejected(self):
+        request = self._callback()
+        with mock.patch.object(flow, "requests") as m:
+            m.post.return_value = _resp({**TOKENS, "scope": "atproto"})
+            with self.assertRaisesRegex(flow.OAuthError, "scope"):
+                flow.complete_auth(request)
+        self.assertEqual(OAuthSession.objects.count(), 0)
+
+    def test_missing_access_token_rejected(self):
+        request = self._callback()
+        tokens = {k: v for k, v in TOKENS.items() if k != "access_token"}
+        with mock.patch.object(flow, "requests") as m:
+            m.post.return_value = _resp(tokens)
+            with self.assertRaisesRegex(flow.OAuthError, "access_token"):
+                flow.complete_auth(request)
+
+    def test_non_numeric_expires_in_does_not_crash(self):
+        request = self._callback()
+        with mock.patch.object(flow, "requests") as m:
+            m.post.return_value = _resp({**TOKENS, "expires_in": "soon"})
+            session = flow.complete_auth(request)
+        self.assertIsNone(session.access_token_expires_at)
+
+    def test_session_key_rotated_on_sign_in(self):
+        request = self._callback()
+        before = request.session.session_key
+        with mock.patch.object(flow, "requests") as m:
+            m.post.return_value = _resp(TOKENS)
+            flow.complete_auth(request)
+        # cycle_key() assigns a fresh key, defeating session fixation.
+        self.assertNotEqual(request.session.session_key, before)
+        self.assertEqual(request.session[flow.DID_KEY], "did:plc:alice")
 
     def test_signing_in_again_replaces_grant(self):
         for token in ("at-old", "at-new"):

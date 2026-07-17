@@ -31,7 +31,9 @@ def _resolve_post(request):
     if not post_id:
         match = _CHANGE_PAGE_RE.search(request.META.get("HTTP_REFERER", ""))
         post_id = match.group("pk") if match else None
-    if not post_id:
+    # A non-numeric post_id would make the pk lookup raise ValueError -> 500;
+    # treat anything that isn't a positive integer as "no post".
+    if not post_id or not str(post_id).isdigit():
         return None
     return Post.objects.filter(pk=post_id).first()
 
@@ -59,7 +61,11 @@ def upload_image(request):
         image=upload,
         alt=request.POST.get("alt", ""),
     )
-    content_image.save()
+    try:
+        content_image.save()
+    except (OSError, ValueError) as e:
+        logger.warning(f"Image upload failed: {e}")
+        return JsonResponse({"status": 400, "error": "Could not process image."})
 
     return JsonResponse(
         {

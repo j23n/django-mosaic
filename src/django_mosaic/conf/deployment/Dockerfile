@@ -10,8 +10,9 @@ WORKDIR /app
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Copy dependency files
-COPY pyproject.toml uv.lock /app/
+# Copy dependency manifest (scaffolded projects ship a pyproject.toml). For
+# reproducible builds, commit a uv.lock and switch to `uv sync --frozen`.
+COPY pyproject.toml /app/
 
 # Install dependencies using uv
 RUN uv pip install --system -r pyproject.toml && \

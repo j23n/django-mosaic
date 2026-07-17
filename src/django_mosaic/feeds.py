@@ -1,7 +1,7 @@
-from django.conf import settings
 from django.contrib.syndication.views import Feed
 from markdownify.templatetags.markdownify import markdownify
 
+from django_mosaic.context_processors import site_constants
 from django_mosaic.models import Namespace, Post
 
 
@@ -9,10 +9,10 @@ class PostFeed(Feed):
     link = "/"
 
     def title(self):
-        return settings.CONSTANTS["site"]["title"]
+        return site_constants()["site"]["title"]
 
     def description(self):
-        return settings.CONSTANTS["site"]["description"]
+        return site_constants()["site"]["description"]
 
     def get_object(self, request, namespace):
         # Exact, case-sensitive match: a case-insensitive collation would

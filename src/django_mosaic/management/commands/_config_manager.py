@@ -12,8 +12,11 @@ from pathlib import Path
 DEFAULT_INSTALL_PATH = "/var/www/mosaic"
 DEFAULT_APP_NAME = "mosaic"
 DEFAULT_GUNICORN_WORKERS = 2
-DEFAULT_WSGI_MODULE = "website.wsgi:application"
-DEFAULT_URL_CONF = "website.urls"
+# Match the flat project layout that `mosaic-admin init` generates (wsgi.py and
+# urls.py at the project root, WSGI_APPLICATION="wsgi.application",
+# ROOT_URLCONF="urls"), so the default deploy of a scaffolded project works.
+DEFAULT_WSGI_MODULE = "wsgi:application"
+DEFAULT_URL_CONF = "urls"
 DEFAULT_SSH_USER = "root"
 DEFAULT_SSH_KEY = "~/.ssh/id_rsa"
 
