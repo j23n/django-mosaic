@@ -9,7 +9,7 @@ from django_mosaic.models import Author, Namespace, Post
 class RevisionTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("testuser")
         cls.author = Author.objects.create(user=user, h_card={})
 

@@ -269,11 +269,13 @@ class Post(models.Model):
             if settings.USE_TZ:
                 published = django.utils.timezone.localtime(published)
             return reverse(
-                "post-detail",
+                "mosaic:post-detail",
                 args=[self.namespace.name, published.year, self.slug],
             )
         else:
-            return reverse("draft-detail", args=[self.namespace.name, self.secret_id])
+            return reverse(
+                "mosaic:draft-detail", args=[self.namespace.name, self.secret_id]
+            )
 
     def __str__(self):
         return f"{self.title}"
@@ -316,7 +318,7 @@ class Tag(models.Model):
         super().save(*args, **kwargs)
 
     def get_absolute_url(self):
-        return reverse("tag-detail", args=[self.namespace.name, self.slug])
+        return reverse("mosaic:tag-detail", args=[self.namespace.name, self.slug])
 
     def __str__(self):
         return f"{self.name} ({self.namespace.name})"

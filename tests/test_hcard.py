@@ -22,7 +22,7 @@ def has_class_tokens(content, *tokens):
 class HCardTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("testuser")
         cls.author = Author.objects.create(
             user=user,
@@ -103,7 +103,7 @@ class HCardRenderingTest(HCardTestBase):
 class HCardBlankFieldsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        ns = Namespace.objects.create(name="public")
+        ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("minimal")
         cls.author = Author.objects.create(
             user=user,
@@ -132,7 +132,7 @@ class HCardBlankFieldsTest(TestCase):
 class HCardNoAuthorTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        Namespace.objects.create(name="public")
+        Namespace.objects.get_or_create(name="public")[0]
 
     def test_no_author_graceful(self):
         """Homepage renders without error when no Author exists."""

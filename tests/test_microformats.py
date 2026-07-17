@@ -21,7 +21,7 @@ def has_class_tokens(content, *tokens):
 class HEntryTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("testuser")
         cls.author = Author.objects.create(user=user, display_name="Test Author")
         cls.tag = Tag.objects.create(name="indieweb", namespace=cls.ns)
@@ -110,7 +110,7 @@ class PostDetailUPhotoTest(HEntryTestBase):
 class HFeedTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("feeduser")
         cls.author = Author.objects.create(user=user, display_name="Feed Author")
         cls.post = Post.objects.create(

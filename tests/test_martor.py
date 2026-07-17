@@ -22,7 +22,7 @@ def make_upload(name="pic.png", mode="RGB", size=(80, 60)):
 class UploadTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         cls.admin = User.objects.create_superuser("boss", "b@x.com", "pass")
         cls.author = Author.objects.create(user=cls.admin)
         cls.post = Post.objects.create(

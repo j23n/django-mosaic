@@ -26,7 +26,7 @@
 	<meta name="twitter:title" content="{{ CONSTANTS.site.title }}">
 	<meta name="twitter:description" content="{{ CONSTANTS.site.description }}">
 	{% endblock %}
-	{% if namespace %}<link rel="alternate" type="application/rss+xml" title="{{ CONSTANTS.site.title }} RSS Feed" href="{% url 'feed' namespace %}">{% endif %}
+	{% if namespace %}<link rel="alternate" type="application/rss+xml" title="{{ CONSTANTS.site.title }} RSS Feed" href="{% url 'mosaic:feed' namespace %}">{% endif %}
 	{% include "includes/header.html" %}
 	{% if author %}{% for link in author.rel_me_links.all %}
 	<link rel="me" href="{{ link.url }}">
@@ -37,8 +37,8 @@
   {% block body %}
 	<header>
 		<nav>
-			<a href="{% url 'home' %}">{{ CONSTANTS.site.title }}</a>
-			<a href="{% url 'ns-home' 'private' %}">Friends & Family</a>
+			<a href="{% url 'mosaic:home' %}">{{ CONSTANTS.site.title }}</a>
+			<a href="{% url 'mosaic:ns-home' 'private' %}">Friends & Family</a>
 		</nav>
 	</header>
 	<main>
@@ -50,7 +50,7 @@
 				{% include "includes/hcard.html" %}
 				<div class="footer-links">
 					<ul class="list-plain">
-					<li>Subscribe with <a href="{% if namespace %}{% url 'feed' namespace %}{% else %}{% url 'feed' 'public' %}{% endif %}" class="muted">RSS</a>.</li>
+					<li>Subscribe with <a href="{% if namespace %}{% url 'mosaic:feed' namespace %}{% else %}{% url 'mosaic:feed' 'public' %}{% endif %}" class="muted">RSS</a>.</li>
 					<li>Made for the <a href="https://indieweb.org" class="muted">indieweb</a> with <a href="https://app.radicle.xyz/nodes/iris.radicle.xyz/rad:zVdCS3rdBtnLLui7jaHTf4X9j6FD" class="muted">Mosaic</a>.</li>
 					{% block footer_extra %}{% endblock %}
 					</ul>

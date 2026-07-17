@@ -66,6 +66,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overrides no longer apply when resolving other handles, and PDS endpoints
   discovered from DID documents are validated (https, no IP literals or
   internal hosts) against SSRF.
+- **Breaking:** the core blog URLs are now under the `mosaic:` application
+  namespace (`reverse("mosaic:home")`, `{% url 'mosaic:post-detail' %}`), so
+  mosaic's short, common names (`home`, `feed`, `post-detail`, …) no longer
+  collide with the consumer project's own global URL names. Update any
+  `reverse(...)`/`{% url %}` references to these names in your project or
+  template overrides to the `mosaic:` prefix. Martor's editor routes stay
+  un-namespaced (martor reverses them internally by bare name).
 
 ### Security (post-review hardening)
 - OAuth: the discovered authorization server and every endpoint from its
@@ -163,6 +170,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silently degrading to owner-only.
 - `manage.py import` is idempotent (re-import updates rather than duplicates)
   and no longer aborts the whole batch on one row's `IntegrityError`.
+- A data migration seeds the default `public` and `private` namespaces, so a
+  freshly migrated project serves `/` instead of 404-ing until an operator
+  hand-creates them in the admin.
 
 ## [0.2.0] - 2026-07-03
 

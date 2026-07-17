@@ -14,7 +14,7 @@ from django_mosaic.models import Author, ContentImage, Namespace, Post, Tag
 class SlugGenerationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("sluguser")
         cls.author = Author.objects.create(user=user)
 
@@ -48,7 +48,7 @@ class SlugGenerationTest(TestCase):
 class PublishedAtConstraintTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("cuser")
         cls.author = Author.objects.create(user=user)
 
@@ -71,7 +71,7 @@ class PublishedAtConstraintTest(TestCase):
 class TagSlugCollisionTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
 
     def test_distinct_names_same_slug_do_not_collide(self):
         # M7: "My Tag" and "my tag" both slugify to "my-tag".
@@ -86,7 +86,7 @@ class TagSlugCollisionTest(TestCase):
 class ContentImageProcessingTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("imguser")
         cls.author = Author.objects.create(user=user)
         cls.post = Post.objects.create(
@@ -129,7 +129,7 @@ class ContentImageProcessingTest(TestCase):
 class UploadEndpointTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         cls.user = User.objects.create_superuser("up", "u@b.com", "pass")
         cls.author = Author.objects.create(user=cls.user)
 
@@ -179,7 +179,7 @@ class ConstantsDefaultTest(TestCase):
 class ImportIdempotencyTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("importer")
         cls.author = Author.objects.create(user=user)
 
@@ -208,11 +208,54 @@ class ImportIdempotencyTest(TestCase):
         self.assertEqual(Post.objects.filter(namespace=self.ns).count(), 1)
 
 
+class UrlNamespaceTest(TestCase):
+    def test_blog_names_are_under_the_mosaic_namespace(self):
+        from django.urls import NoReverseMatch, reverse
+
+        # The blog routes are reachable as "mosaic:<name>"...
+        self.assertEqual(reverse("mosaic:home"), "/")
+        self.assertTrue(
+            reverse("mosaic:post-detail", args=["public", 2026, "hi"]).endswith(
+                "/public/posts/2026/hi"
+            )
+        )
+        # ...and NOT as bare global names, so they can't shadow a consumer's.
+        with self.assertRaises(NoReverseMatch):
+            reverse("home")
+        with self.assertRaises(NoReverseMatch):
+            reverse("post-detail", args=["public", 2026, "hi"])
+
+    def test_martor_endpoints_stay_unnamespaced(self):
+        from django.urls import reverse
+
+        # Martor reverses its own routes by bare name internally, so mounting it
+        # must not sweep it into the mosaic namespace.
+        self.assertTrue(reverse("martor_markdownfy"))
+
+
+class DefaultNamespaceSeedTest(TestCase):
+    def test_public_and_private_seeded_by_migration(self):
+        # The data migration creates these, so a freshly migrated project (and
+        # this test DB) has them without anyone making them by hand.
+        names = set(
+            Namespace.objects.filter(name__in=["public", "private"]).values_list(
+                "name", flat=True
+            )
+        )
+        self.assertEqual(names, {"public", "private"})
+
+    def test_home_renders_on_a_fresh_project(self):
+        # Nothing created a namespace in this test; "/" must still 200 rather
+        # than 404 because "public" was seeded.
+        resp = self.client.get("/")
+        self.assertEqual(resp.status_code, 200)
+
+
 class ViewScopingTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.public = Namespace.objects.create(name="public")
-        cls.private = Namespace.objects.create(name="private")
+        cls.public = Namespace.objects.get_or_create(name="public")[0]
+        cls.private = Namespace.objects.get_or_create(name="private")[0]
         user = User.objects.create_user("vuser")
         cls.author = Author.objects.create(user=user)
         cls.private_post = Post.objects.create(
@@ -254,7 +297,7 @@ class ViewScopingTest(TestCase):
 class AdminPublishTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         cls.user = User.objects.create_superuser("admin2", "a@b.com", "pass")
         cls.author = Author.objects.create(user=cls.user)
 

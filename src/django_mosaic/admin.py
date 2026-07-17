@@ -155,7 +155,7 @@ class PostAdmin(VersionAdmin):
         obj = self.get_object(request, object_id)
         if obj:
             extra_context["draft_preview_url"] = reverse(
-                "draft-detail", args=[obj.namespace.name, obj.secret_id]
+                "mosaic:draft-detail", args=[obj.namespace.name, obj.secret_id]
             )
         # Bypass VersionAdmin.change_view which wraps everything in
         # create_revision(). We handle revision creation in save_model

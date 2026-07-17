@@ -41,7 +41,7 @@
 <small>
 Written on
 <time class="dt-published" datetime="{{ post.published_at|date:'c' }}">{{ post.published_at|date:'Y-m-d' }}</time>
-by <a class="muted p-author h-card" href="{% url 'home' %}">{{ post.author.user.username }}</a>
+by <a class="muted p-author h-card" href="{% url 'mosaic:home' %}">{{ post.author.user.username }}</a>
 {% if post.tags.all %} in {% for t in post.tags.all %}<a class="muted p-category" href="{{ t.get_absolute_url }}">{{ t.name }}</a> {% endfor %}{% endif %}
 </small>
 </hgroup>

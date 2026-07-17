@@ -21,7 +21,7 @@ def make_upload(name="p.png"):
 class PaginationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("pageuser")
         cls.author = Author.objects.create(user=user)
         for i in range(25):
@@ -90,7 +90,7 @@ class PaginationTest(TestCase):
 class OrphanedMediaTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("mediauser")
         cls.author = Author.objects.create(user=user)
 

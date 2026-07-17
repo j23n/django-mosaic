@@ -24,17 +24,25 @@ mosaic_patterns = [
     path("posts/drafts/<str:secret_id>", draft_detail, name="draft-detail"),
 ]
 
-urlpatterns = [
+# The blog routes live under the "mosaic:" URL namespace (reverse("mosaic:home"),
+# {% url 'mosaic:post-detail' %}), so mosaic's short, common names — home, feed,
+# post-detail — never collide with the consumer project's own global names.
+blog_patterns = [
     path("", home, name="home"),
     path("sitemap.xml", sitemap, {"sitemaps": {"posts": PostSitemap}}, name="sitemap"),
     path("robots.txt", robots_txt, name="robots-txt"),
-    # Martor editor endpoints (live preview). Must precede the namespace
-    # catch-all or "martor" would be treated as a namespace.
-    path("martor/", include("martor.urls")),
     path("<slug:namespace>/", include(mosaic_patterns)),
     protected_path(
         "private/", include(mosaic_patterns), kwargs={"namespace": "private"}
     ),
+]
+
+urlpatterns = [
+    # Martor's editor endpoints are reversed by martor itself with bare names
+    # (e.g. "martor_markdownfy"), so they must stay OUT of the mosaic namespace.
+    # Kept before the blog include so "martor/" isn't captured as a namespace.
+    path("martor/", include("martor.urls")),
+    path("", include((blog_patterns, "mosaic"))),
 ]
 
 if settings.DEBUG:

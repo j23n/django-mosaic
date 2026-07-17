@@ -61,7 +61,7 @@ CONSTELLATION_RESPONSE = {
 class ReactionsTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.ns = Namespace.objects.create(name="public")
+        cls.ns = Namespace.objects.get_or_create(name="public")[0]
         user = User.objects.create_user("ruser")
         cls.author = Author.objects.create(user=user)
         cls.post = Post.objects.create(

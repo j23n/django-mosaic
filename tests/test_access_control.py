@@ -8,8 +8,8 @@ from django_mosaic.models import Author, Namespace, Post
 class AccessControlTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.public_ns = Namespace.objects.create(name="public")
-        cls.private_ns = Namespace.objects.create(name="private")
+        cls.public_ns = Namespace.objects.get_or_create(name="public")[0]
+        cls.private_ns = Namespace.objects.get_or_create(name="private")[0]
 
         user = User.objects.create_user("testuser")
         cls.author = Author.objects.create(user=user, h_card={})

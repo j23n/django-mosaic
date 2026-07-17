@@ -59,8 +59,8 @@ class FakeSession:
 class BridgeTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.public = Namespace.objects.create(name="public")
-        cls.private = Namespace.objects.create(name="private")
+        cls.public = Namespace.objects.get_or_create(name="public")[0]
+        cls.private = Namespace.objects.get_or_create(name="private")[0]
         user = User.objects.create_user("atuser")
         cls.author = Author.objects.create(user=user)
 

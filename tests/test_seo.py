@@ -7,8 +7,8 @@ from django_mosaic.models import Author, ContentImage, Namespace, Post
 class SEOTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.public_ns = Namespace.objects.create(name="public")
-        cls.private_ns = Namespace.objects.create(name="private")
+        cls.public_ns = Namespace.objects.get_or_create(name="public")[0]
+        cls.private_ns = Namespace.objects.get_or_create(name="private")[0]
         user = User.objects.create_user("testuser")
         cls.author = Author.objects.create(user=user, display_name="Test Author")
         cls.post = Post.objects.create(
@@ -214,7 +214,7 @@ class HomepageMetaTest(SEOTestBase):
 class RobotsTxtTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        Namespace.objects.create(name="public")
+        Namespace.objects.get_or_create(name="public")[0]
 
     def test_robots_txt_status_and_content_type(self):
         resp = self.client.get("/robots.txt")
