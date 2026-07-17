@@ -251,7 +251,10 @@ workers. `""` is used as a cached-miss sentinel where absence must be cached.
 
 - **SSRF**: every PDS / authorization-server / endpoint URL discovered from an
   attacker-controllable document is validated (https, no IP literals, no
-  internal hosts) before mosaic connects to it or POSTs credentials.
+  internal hosts, and the resolved IP must be public) before mosaic connects to
+  it or POSTs credentials — including the `did:web` document fetch itself.
+  Outbound requests never follow redirects, so a validated endpoint can't
+  bounce the request to an internal host.
 - **OAuth**: PKCE S256, PAR, DPoP-bound tokens, `private_key_jwt`; the
   callback `iss` is required and checked; refresh is row-locked; token
   material is never rendered in the admin (delete a row to revoke).
@@ -291,7 +294,10 @@ workers. `""` is used as a cached-miss sentinel where absence must be cached.
 - Tests that exercise import-time routes define a module-level `urlpatterns`
   and set `ROOT_URLCONF=__name__`.
 - CI (`.github/workflows/ci.yml`): ruff + black, then the suite across
-  Python 3.12/3.13 × Django 5.2/6.0. `manage.py atproto check` validates the
+  Python 3.12/3.13 × Django 5.2/6.0. The matrix pins the interpreter with
+  `uv --python` and runs with `uv run --no-sync` so each leg genuinely tests
+  its own Python/Django (a bare `uv run` re-syncs to the lockfile and would
+  collapse the matrix to one cell). `manage.py atproto check` validates the
   live reaction parsers against the real APIs by hand (the sandbox can't reach
   them).
 

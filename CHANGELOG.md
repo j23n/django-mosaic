@@ -93,6 +93,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   domains are locked. Concurrent claims/domain writes return a friendly
   conflict instead of a 500. Report throttle keys on `(IP, site)`.
 
+### Security (second review round)
+- SSRF: outbound ATProto/OAuth HTTP no longer follows redirects, so a
+  validated public endpoint can't 30x-bounce a request (with its client
+  assertion or token) to an internal host; endpoint validation now also
+  resolves the hostname and rejects names that map to internal/reserved IPs
+  (e.g. `*.nip.io`); and the `did:web` document fetch itself is validated,
+  not just the endpoint inside the returned document. (Active DNS rebinding
+  is still out of scope — noted in `client._resolves_to_public_ip`.)
+- Record/collection reads on the public render path use a short
+  `READ_TIMEOUT` (default 5s) instead of the 15s publish timeout, so a
+  slow/hostile PDS (arbitrary in preview mode) can't tie up a worker across a
+  page's sections.
+- Jetstream: `handle_event` (which invalidates caches, and via `DatabaseCache`
+  touches the ORM) now runs through `sync_to_async` too — a shared DB-backed
+  cache would otherwise raise `SynchronousOnlyOperation` on the first event
+  and reconnect forever processing nothing.
+- Hosted: a pending (unverified) custom-domain registration is protected from
+  reclaim until it goes stale (`DOMAIN_RECLAIM_HOURS`, default 72), closing a
+  race where an attacker could grab a victim's freshly-pointed domain before
+  its first request verified it. Suspended tenants are now locked out of the
+  dashboard, composer, and domain settings, not just public serving.
+- The private-namespace token gate can no longer be bypassed with URL casing
+  (e.g. `/PRIVATE/…`) on case-insensitive database collations: views and the
+  RSS feed require an exact-case namespace match.
+
+### Fixed
+- CI test matrix now actually varies: `uv run` was re-syncing the environment
+  and undoing the per-leg Django pin, and a checked-in `.python-version`
+  overrode the interpreter, so every leg silently ran the same Python/Django.
+  The matrix pins the interpreter with `--python` and runs with `--no-sync`.
+
 ## [0.2.0] - 2026-07-03
 
 ### Added

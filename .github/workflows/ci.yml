@@ -45,9 +45,15 @@ jobs:
           enable-cache: true
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
+      # --python pins the interpreter (a checked-in .python-version would
+      # otherwise override `uv python install` for every leg). --no-sync on the
+      # test step is essential: a bare `uv run` re-syncs against uv.lock and
+      # silently undoes the Django pin below, collapsing the matrix to one cell.
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync --all-extras --dev --python ${{ matrix.python-version }}
       - name: Pin Django ${{ matrix.django-version }}
-        run: uv pip install "django~=${{ matrix.django-version }}.0"
+        run: uv pip install --python ${{ matrix.python-version }} "django~=${{ matrix.django-version }}.0"
+      - name: Show resolved versions
+        run: uv run --no-sync --python ${{ matrix.python-version }} python -c "import sys, django; print('python', sys.version); print('django', django.get_version())"
       - name: Run tests
-        run: uv run pytest -q
+        run: uv run --no-sync --python ${{ matrix.python-version }} pytest -q

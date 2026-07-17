@@ -101,6 +101,7 @@ def describe_repo(identity=None):
             target.pds_url,
             "com.atproto.repo.describeRepo",
             {"repo": target.did},
+            timeout=conf.get_setting("READ_TIMEOUT"),
         )
         collections = list(data.get("collections", []))
     except Exception as e:  # noqa: BLE001 - a PDS outage must not 500 the site
@@ -138,7 +139,12 @@ def list_records(collection, identity=None, limit=MAX_RECORDS):
             }
             if cursor:
                 params["cursor"] = cursor
-            data = xrpc_get(target.pds_url, "com.atproto.repo.listRecords", params)
+            data = xrpc_get(
+                target.pds_url,
+                "com.atproto.repo.listRecords",
+                params,
+                timeout=conf.get_setting("READ_TIMEOUT"),
+            )
             for item in data.get("records", []):
                 records.append(
                     {

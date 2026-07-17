@@ -96,6 +96,67 @@ class HandleEventTest(TestCase):
         self.assertEqual(cursor, 8)
 
 
+class ConsumeAsyncSafetyTest(TestCase):
+    """consume() must invalidate caches through sync_to_async.
+
+    A cache whose mutators are @async_unsafe (as DatabaseCache's are) raises
+    SynchronousOnlyOperation if touched directly from the event loop; driving
+    one event through consume() proves handle_event is marshalled off it.
+    """
+
+    def test_event_invalidates_via_async_wrapper(self):
+        import asyncio
+
+        from django.utils.asyncio import async_unsafe
+
+        collection_key = f"mosaic_atproto:collections:{DID}"
+
+        class AsyncUnsafeCache:
+            def __init__(self):
+                self.deleted = []
+
+            def get(self, key):
+                return None
+
+            def set(self, *args, **kwargs):
+                pass
+
+            @async_unsafe
+            def delete(self, key):
+                self.deleted.append(key)
+
+            @async_unsafe
+            def delete_many(self, keys):
+                self.deleted.extend(keys)
+
+        fake_cache = AsyncUnsafeCache()
+
+        async def _one_then_stop():
+            yield _commit("sh.tangled.repo", time_us=55)
+            raise asyncio.CancelledError  # break the otherwise-infinite loop
+
+        class FakeConn:
+            async def __aenter__(self):
+                return _one_then_stop()
+
+            async def __aexit__(self, *args):
+                return False
+
+        with (
+            mock.patch("websockets.connect", lambda url: FakeConn()),
+            mock.patch(
+                "django_mosaic.atproto.jetstream.wanted_dids", return_value=[DID]
+            ),
+            mock.patch("django_mosaic.atproto.jetstream.cache", fake_cache),
+        ):
+            with self.assertRaises(asyncio.CancelledError):
+                asyncio.run(jetstream.consume(url="wss://x", reconnect_delay_max=1))
+
+        # The commit's collection cache was invalidated — and no
+        # SynchronousOnlyOperation was raised getting there.
+        self.assertIn(collection_key, fake_cache.deleted)
+
+
 class WantedDidsTest(TestCase):
     def test_owner_plus_active_tenants_deduped(self):
         from django_mosaic.atproto.identity import Identity

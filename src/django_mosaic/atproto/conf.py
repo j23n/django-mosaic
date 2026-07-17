@@ -46,6 +46,11 @@ DEFAULTS = {
     "COMPANION_TEXT": "New post: {title}\n\n{url}",
     # Timeout (seconds) for publish/write XRPC calls (run from mgmt commands).
     "TIMEOUT": 15,
+    # Timeout (seconds) for record/collection reads on the public render path.
+    # These target an arbitrary, possibly attacker-chosen PDS in preview mode,
+    # so it is kept short: a PDS that accepts but never answers must not tie up
+    # a worker for the full publish TIMEOUT across a page's sections.
+    "READ_TIMEOUT": 5,
     # Timeout (seconds) for reaction fetches on the public render path. Kept
     # short so a slow/down PDS or index can't hang a post page for readers.
     "REACTIONS_TIMEOUT": 3,

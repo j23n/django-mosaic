@@ -16,6 +16,7 @@ from django.db import IntegrityError, transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
 from django_mosaic.atproto import identity as identity_mod
@@ -233,6 +234,18 @@ def claim(request):
     return render(request, "hosted/claim.html", context)
 
 
+def _suspended_response(request, tenant):
+    """A 403 page if `tenant` is suspended, else None.
+
+    Suspension must lock *writes*, not just public serving. Otherwise a
+    suspended tenant could still publish to their PDS and — via the domain
+    reclaim path — wipe other tenants' pending domain registrations.
+    """
+    if tenant.status != Tenant.STATUS_ACTIVE:
+        return render(request, "hosted/unavailable.html", status=403)
+    return None
+
+
 @require_http_methods(["GET", "POST"])
 def dashboard(request):
     """Sections + theme for the signed-in tenant, saved to *their* PDS.
@@ -253,6 +266,9 @@ def dashboard(request):
     tenant = Tenant.objects.filter(did=session.did).first()
     if tenant is None:
         return redirect("hosted-claim")
+    suspended = _suspended_response(request, tenant)
+    if suspended is not None:
+        return suspended
 
     try:
         identity = _tenant_identity(tenant)
@@ -326,6 +342,9 @@ def dashboard_write(request):
     tenant = Tenant.objects.filter(did=session.did).first()
     if tenant is None:
         return redirect("hosted-claim")
+    suspended = _suspended_response(request, tenant)
+    if suspended is not None:
+        return suspended
 
     context = {
         "session": session,
@@ -359,6 +378,9 @@ def dashboard_domain(request):
     )
     if tenant is None:
         return redirect("hosted-claim")
+    suspended = _suspended_response(request, tenant)
+    if suspended is not None:
+        return suspended
 
     if request.POST.get("remove"):
         tenant.custom_domain = None
@@ -387,11 +409,15 @@ def _register_domain(tenant, domain):
     an error string, or None on success.
 
     A *verified* domain is locked to its tenant (proven control), so no one
-    can take it. An unverified registration is just a pending intent and can
-    be reclaimed — this stops a squatter from permanently blocking the real
-    owner by registering a string they don't control. Whoever's DNS actually
-    points here verifies on first request and locks it.
+    can take it. An unverified registration is a pending intent — reclaimable,
+    but only once it has gone *stale* (see conf.domain_reclaim_after). Without
+    that staleness gate an attacker could reclaim a victim's fresh pending
+    registration and then be the row holder at the instant the victim's own
+    DNS triggers first-request verification, hijacking a domain the victim
+    actually controls. Whoever's DNS points here verifies on first request and
+    locks it well within the window.
     """
+    reclaim_cutoff = timezone.now() - conf.domain_reclaim_after()
     with transaction.atomic():
         holder = (
             Tenant.objects.select_for_update()
@@ -402,6 +428,13 @@ def _register_domain(tenant, domain):
         if holder is not None:
             if holder.domain_verified_at is not None:
                 return "That domain is already connected to another site."
+            if holder.updated_at > reclaim_cutoff:
+                # Recent pending registration — may be a real owner mid-setup.
+                return (
+                    "That domain has a pending registration on another site. "
+                    "If it belongs to you, finish pointing its DNS here to "
+                    "verify it, or try again later."
+                )
             holder.custom_domain = None
             holder.domain_verified_at = None
             holder.save(update_fields=["custom_domain", "domain_verified_at"])

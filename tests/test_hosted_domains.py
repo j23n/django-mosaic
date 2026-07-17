@@ -193,15 +193,25 @@ class DashboardDomainTest(TestCase):
             tenant.refresh_from_db()
             self.assertIsNone(tenant.custom_domain, bad)
 
-    def test_unverified_domain_can_be_reclaimed(self):
+    def test_stale_unverified_domain_can_be_reclaimed(self):
         # A squatter registering a string they don't control (unverified) must
-        # not permanently block the real owner from connecting it.
+        # not *permanently* block the real owner — once the pending
+        # registration goes stale it is reclaimable.
+        from datetime import timedelta
+
+        from django.utils import timezone
+
         squatter = _tenant(
             did="did:plc:squatter",
             handle="squatter.example",
             subdomain="squatter",
             custom_domain="contested.blog",
         )
+        # Age the registration past the reclaim window (updated_at is auto_now,
+        # so bypass it with a direct UPDATE).
+        stale = timezone.now() - timedelta(hours=100)
+        Tenant.objects.filter(pk=squatter.pk).update(updated_at=stale)
+
         tenant = self._tenant_signed_in()
         resp = self.client.post("/dashboard/domain", {"domain": "contested.blog"})
         self.assertEqual(resp.status_code, 302)
@@ -209,6 +219,25 @@ class DashboardDomainTest(TestCase):
         squatter.refresh_from_db()
         self.assertEqual(tenant.custom_domain, "contested.blog")
         self.assertIsNone(squatter.custom_domain)  # reclaimed
+
+    def test_fresh_unverified_domain_not_hijackable(self):
+        # An attacker must not be able to reclaim a victim's *fresh* pending
+        # registration out from under them before their DNS verifies it — that
+        # is the domain-hijack race the staleness gate closes.
+        victim = _tenant(
+            did="did:plc:victim",
+            handle="victim.example",
+            subdomain="victim",
+            custom_domain="contested.blog",
+        )
+        attacker = self._tenant_signed_in()
+        resp = self.client.post("/dashboard/domain", {"domain": "contested.blog"})
+        self.assertEqual(resp.status_code, 302)
+        victim.refresh_from_db()
+        attacker.refresh_from_db()
+        # The victim keeps their pending registration; the attacker gets nothing.
+        self.assertEqual(victim.custom_domain, "contested.blog")
+        self.assertIsNone(attacker.custom_domain)
 
     def test_anonymous_redirected(self):
         resp = self.client.post("/dashboard/domain", {"domain": "a.blog"})

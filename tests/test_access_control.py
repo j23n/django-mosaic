@@ -73,6 +73,21 @@ class PostDetailAccessControlTest(AccessControlTestBase):
         # protected_path requires authentication -- unauthenticated gets 403
         self.assertEqual(resp.status_code, 403)
 
+    def test_case_variant_private_namespace_does_not_bypass_gate(self):
+        # The token gate matches the "private/" path prefix case-sensitively.
+        # A case-insensitive DB collation must not let /PRIVATE/... resolve the
+        # gated namespace and serve its posts unauthenticated: the view
+        # requires an exact-case namespace match, so these 404 (never 200).
+        year = self.private_post.published_at.year
+        for url in (
+            f"/PRIVATE/posts/{year}/private-post",
+            "/PRIVATE/",
+            "/PRIVATE/posts",
+            "/PRIVATE/feed",
+        ):
+            resp = self.client.get(url)
+            self.assertEqual(resp.status_code, 404, url)
+
 
 class PrevNextNavigationTest(AccessControlTestBase):
     @classmethod

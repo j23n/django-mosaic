@@ -173,6 +173,7 @@ def fetch_crossapp_counts(targets, blocking=True):
                     f"{_constellation_url()}/links/all",
                     params={"target": target},
                     timeout=conf.get_setting("REACTIONS_TIMEOUT"),
+                    allow_redirects=False,
                 )
                 resp.raise_for_status()
                 counts = _parse_constellation(resp.json())

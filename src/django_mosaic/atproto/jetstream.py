@@ -146,6 +146,10 @@ async def consume(url=None, reconnect_delay_max=60):
     aget_dids = sync_to_async(wanted_dids)
     aget_cursor = sync_to_async(lambda: cache.get(CURSOR_CACHE_KEY))
     aset_cursor = sync_to_async(lambda v: cache.set(CURSOR_CACHE_KEY, v, None))
+    # handle_event touches the cache (and, via DatabaseCache, the ORM), which is
+    # unsafe from the async loop — an @async_unsafe backend raises
+    # SynchronousOnlyOperation on the first event and tears the socket down.
+    ahandle_event = sync_to_async(handle_event)
 
     delay = 1
     while True:
@@ -162,7 +166,7 @@ async def consume(url=None, reconnect_delay_max=60):
                 seen = 0
                 async for message in socket:
                     delay = 1  # a live message proves the connection works
-                    event_cursor = handle_event(message)
+                    event_cursor = await ahandle_event(message)
                     seen += 1
                     if event_cursor and seen % CURSOR_SAVE_EVERY == 0:
                         await aset_cursor(event_cursor)

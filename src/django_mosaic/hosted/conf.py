@@ -25,6 +25,13 @@ DEFAULTS = {
     # The DNS target shown in the custom-domain instructions (what tenants
     # point their CNAME/ALIAS at). Defaults to the base domain.
     "DOMAIN_TARGET": "",
+    # A pending (unverified) custom-domain registration is reclaimable by a
+    # different tenant only after this many hours without verification. The
+    # window must comfortably exceed DNS propagation + the first request, so a
+    # real owner who has pointed DNS verifies and locks the domain long before
+    # anyone can reclaim it — while a stale squat of a string nobody controls
+    # eventually frees up. Guards the domain-hijack race in `_register_domain`.
+    "DOMAIN_RECLAIM_HOURS": 72,
 }
 
 # Always reserved regardless of settings — infrastructure and confusables.
@@ -94,3 +101,10 @@ def claim_allowed(did):
 
 def domain_target():
     return get_setting("DOMAIN_TARGET") or base_domain()
+
+
+def domain_reclaim_after():
+    """How long a pending domain registration is protected from reclaim."""
+    from datetime import timedelta
+
+    return timedelta(hours=get_setting("DOMAIN_RECLAIM_HOURS"))

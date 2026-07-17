@@ -49,8 +49,11 @@ class OAuthError(Exception):
 
 
 def _get_json(url):
-    resp = requests.get(url, timeout=conf.get_setting("TIMEOUT"))
-    if resp.status_code >= 400:
+    # Never follow redirects: _safe_endpoint validates the URL we fetch, and a
+    # validated endpoint must not be able to bounce discovery to an internal
+    # host (see atproto.client._http_get). A 3xx is therefore an error.
+    resp = requests.get(url, timeout=conf.get_setting("TIMEOUT"), allow_redirects=False)
+    if resp.status_code >= 300:
         raise OAuthError(f"GET {url} failed: HTTP {resp.status_code}")
     try:
         return resp.json()
@@ -151,12 +154,13 @@ def _post_with_dpop(url, data, dpop_jwk, nonce=None):
             data=data,
             headers={"DPoP": dpop.proof(dpop_jwk, "POST", url, nonce=nonce)},
             timeout=conf.get_setting("TIMEOUT"),
+            allow_redirects=False,
         )
         if attempt == 0 and _wants_dpop_nonce(resp):
             nonce = resp.headers["DPoP-Nonce"]
             continue
         break
-    if resp.status_code >= 400:
+    if resp.status_code >= 300:
         try:
             detail = resp.json()
         except ValueError:
@@ -413,6 +417,7 @@ def xrpc_call(session, nsid, method="GET", params=None, json_body=None):
             json=json_body,
             headers=headers,
             timeout=conf.get_setting("TIMEOUT"),
+            allow_redirects=False,
         )
         # A nonce demand is free to retry and must not consume the refresh
         # budget; honor it once (a server that keeps demanding is broken).
@@ -433,7 +438,7 @@ def xrpc_call(session, nsid, method="GET", params=None, json_body=None):
         session.dpop_pds_nonce = resp.headers["DPoP-Nonce"]
         session.save(update_fields=["dpop_pds_nonce"])
 
-    if resp.status_code >= 400:
+    if resp.status_code >= 300:
         try:
             detail = resp.json()
         except ValueError:

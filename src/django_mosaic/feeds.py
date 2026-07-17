@@ -15,7 +15,14 @@ class PostFeed(Feed):
         return settings.CONSTANTS["site"]["description"]
 
     def get_object(self, request, namespace):
-        return Namespace.objects.get(name=namespace)
+        # Exact, case-sensitive match: a case-insensitive collation would
+        # otherwise let /PRIVATE/feed resolve the gated `private` namespace and
+        # leak its posts past the case-sensitive token gate (see
+        # views._resolve_namespace).
+        obj = Namespace.objects.get(name=namespace)
+        if obj.name != namespace:
+            raise Namespace.DoesNotExist
+        return obj
 
     def items(self, obj):
         return Post.objects.filter(namespace=obj, is_published=True).select_related(

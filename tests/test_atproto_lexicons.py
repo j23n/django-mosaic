@@ -84,6 +84,24 @@ class ListRecordsTest(LexiconTestBase):
             lexicons.list_records("sh.tangled.repo")
         fetch.assert_called_once()
 
+    def test_read_path_uses_short_timeout(self):
+        # Reads target an arbitrary (possibly attacker-chosen) PDS in preview
+        # mode, so they must use the short READ_TIMEOUT, not the 15s publish
+        # TIMEOUT, or a stalling PDS could tie up a worker per page section.
+        from django_mosaic.atproto import conf as atconf
+
+        with mock.patch(
+            "django_mosaic.atproto.lexicons.xrpc_get",
+            return_value=TANGLED_RECORDS,
+        ) as fetch:
+            lexicons.list_records("sh.tangled.repo")
+        self.assertEqual(
+            fetch.call_args.kwargs["timeout"], atconf.get_setting("READ_TIMEOUT")
+        )
+        self.assertLess(
+            atconf.get_setting("READ_TIMEOUT"), atconf.get_setting("TIMEOUT")
+        )
+
     def test_blob_url(self):
         url = lexicons.blob_url(
             {"$type": "blob", "ref": {"$link": "bafyx"}, "mimeType": "image/jpeg"}

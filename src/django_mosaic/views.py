@@ -1,9 +1,28 @@
 from django.conf import settings
 from django.core.paginator import Paginator
+from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from reversion.models import Version
 
 from django_mosaic.models import ContentImage, Namespace, Post, Tag
+
+
+def _resolve_namespace(namespace):
+    """Fetch a namespace by its exact, case-sensitive name (404 otherwise).
+
+    The token gate that protects the "private" prefix
+    (django_magic_authorization middleware) matches ``request.path``
+    case-sensitively, but the database lookup ``namespace__name=…`` is
+    case-*insensitive* under some collations (e.g. MySQL's default). Without an
+    exact-case check, ``/PRIVATE/…`` would resolve the ``private`` namespace
+    while slipping past the gate — serving gated content unauthenticated. Every
+    view resolves the namespace through here first so a non-canonical casing
+    404s regardless of database collation.
+    """
+    ns = get_object_or_404(Namespace, name=namespace)
+    if ns.name != namespace:
+        raise Http404("No namespace matches the given query.")
+    return ns
 
 
 def _get_posts(namespace="public"):
@@ -24,7 +43,7 @@ def _paginate(request, queryset):
 
 
 def home(request, namespace="public"):
-    get_object_or_404(Namespace, name=namespace)
+    _resolve_namespace(namespace)
     all_posts = _get_posts(namespace)
     # Tags reflect the whole namespace, not just the current page.
     tags = Tag.objects.filter(post__in=all_posts).distinct().order_by("name")
@@ -38,6 +57,7 @@ def home(request, namespace="public"):
 
 
 def post_list(request, namespace):
+    _resolve_namespace(namespace)
     page = _paginate(request, _get_posts(namespace))
     return render(
         request,
@@ -47,6 +67,7 @@ def post_list(request, namespace):
 
 
 def post_detail(request, namespace, year, post_slug):
+    _resolve_namespace(namespace)
     post = get_object_or_404(
         Post.objects.select_related("namespace", "author__user"),
         slug=post_slug,
@@ -84,6 +105,7 @@ def post_detail(request, namespace, year, post_slug):
 
 
 def draft_detail(request, namespace, secret_id):
+    _resolve_namespace(namespace)
     post = get_object_or_404(Post, secret_id=secret_id, namespace__name=namespace)
 
     versions = Version.objects.get_for_object(post)
@@ -100,6 +122,7 @@ def draft_detail(request, namespace, secret_id):
 
 
 def tag_detail(request, namespace, slug):
+    _resolve_namespace(namespace)
     tag = get_object_or_404(Tag, slug=slug, namespace__name=namespace)
 
     tagged = _get_posts(namespace).filter(tags=tag)

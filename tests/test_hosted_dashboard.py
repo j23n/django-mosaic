@@ -208,6 +208,21 @@ class DashboardViewTest(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp["Location"], "/claim")
 
+    def test_suspended_tenant_locked_out_of_dashboard_paths(self):
+        # Suspension must block writes, not just public serving: a suspended
+        # tenant may not reach the dashboard, composer, or domain settings.
+        _sign_in(self.client)
+        Tenant.objects.create(
+            did="did:plc:alice",
+            handle="alice.example",
+            subdomain="alice",
+            status=Tenant.STATUS_SUSPENDED,
+        )
+        self.assertEqual(self.client.get("/dashboard").status_code, 403)
+        self.assertEqual(self.client.get("/dashboard/write").status_code, 403)
+        resp = self.client.post("/dashboard/domain", {"domain": "evil.blog"})
+        self.assertEqual(resp.status_code, 403)
+
     def _with_tenant(self):
         _sign_in(self.client)
         return Tenant.objects.create(

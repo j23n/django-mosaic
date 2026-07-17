@@ -212,6 +212,7 @@ class Command(BaseCommand):
                 f"{reactions.CONSTELLATION_URL}/links/all",
                 params={"target": document.uri},
                 timeout=conf.get_setting("TIMEOUT"),
+                allow_redirects=False,
             )
             resp.raise_for_status()
             self.stdout.write(json.dumps(resp.json(), indent=2)[:2000])

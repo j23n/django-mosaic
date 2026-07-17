@@ -212,3 +212,77 @@ class PdsUrlValidationTest(TestCase):
         ):
             with self.assertRaises(AtprotoError):
                 _validate_pds_url(url)
+
+    def test_public_hostname_resolving_to_internal_ip_rejected(self):
+        # A public-looking name whose A record points at an internal address
+        # (DNS-based SSRF, e.g. a .nip.io host) must be refused.
+        from unittest.mock import patch
+
+        with patch(
+            "django_mosaic.atproto.client.socket.getaddrinfo",
+            return_value=[(2, 1, 6, "", ("169.254.169.254", 0))],
+        ):
+            with self.assertRaises(AtprotoError):
+                _validate_pds_url("https://pds.attacker.example")
+
+    def test_public_hostname_resolving_to_public_ip_accepted(self):
+        from unittest.mock import patch
+
+        with patch(
+            "django_mosaic.atproto.client.socket.getaddrinfo",
+            return_value=[(2, 1, 6, "", ("93.184.216.34", 0))],
+        ):
+            self.assertEqual(
+                _validate_pds_url("https://pds.example.com"),
+                "https://pds.example.com",
+            )
+
+    def test_unresolvable_hostname_allowed(self):
+        # A name that does not resolve is not an SSRF risk (the request cannot
+        # connect), so validation fails open rather than blocking real hosts
+        # that a sandbox simply cannot resolve.
+        import socket
+        from unittest.mock import patch
+
+        with patch(
+            "django_mosaic.atproto.client.socket.getaddrinfo",
+            side_effect=socket.gaierror,
+        ):
+            self.assertEqual(
+                _validate_pds_url("https://pds.example.com"),
+                "https://pds.example.com",
+            )
+
+
+class DidWebAndRedirectSsrfTest(TestCase):
+    def test_did_web_internal_host_rejected_before_fetch(self):
+        from django_mosaic.atproto.client import resolve_pds
+
+        for did in ("did:web:169.254.169.254", "did:web:10.0.0.5%3a8443"):
+            with self.assertRaises(AtprotoError):
+                resolve_pds(did)
+
+    def test_redirect_response_refused(self):
+        from types import SimpleNamespace
+
+        from django_mosaic.atproto.client import _raise_for_error
+
+        resp = SimpleNamespace(
+            status_code=302,
+            headers={"Location": "http://169.254.169.254/"},
+            request=SimpleNamespace(url="https://pds.example.com/x"),
+        )
+        with self.assertRaises(AtprotoError):
+            _raise_for_error(resp)
+
+    def test_http_helpers_disable_redirects(self):
+        from unittest.mock import patch
+
+        from django_mosaic.atproto import client
+
+        with patch.object(client.requests, "get") as get:
+            client._http_get("https://pds.example.com/x", timeout=1)
+        self.assertFalse(get.call_args.kwargs["allow_redirects"])
+        with patch.object(client.requests, "post") as post:
+            client._http_post("https://pds.example.com/x", timeout=1)
+        self.assertFalse(post.call_args.kwargs["allow_redirects"])
