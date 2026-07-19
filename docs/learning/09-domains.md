@@ -480,6 +480,18 @@ confirm the handle change); mosaic only owns the forward half.
 - **Why reset `domain_verified_at = None` every time the domain is set?** A
   changed or re-added domain is a *different* control claim; the previous
   verification says nothing about the new DNS. Force a fresh first-request proof.
+- **Why does `ask` also approve the base domain and tenant subdomains?**
+  *(added later, for the compose self-host stack — PR 13.)* Originally the
+  endpoint answered only for *custom* domains, because subdomains were assumed
+  to ride a wildcard certificate. But a wildcard cert requires a DNS-01
+  challenge — provider-specific API plumbing that a generic self-host stack
+  can't ship. Extending `_serves_domain` to mirror the middleware's host
+  resolution (base domain; single-label subdomains of active tenants; custom
+  domains) lets an on-demand-TLS ingress issue *every* certificate the same
+  way, no wildcard needed. Review question: why must the nested-label refusal
+  (`deep.alice.mosaic.example`) match the middleware exactly? Because any host
+  the ingress certifies but the app 404s (or vice versa) is either a wasted
+  cert or a served-but-uncertified host — the two host-models must be one.
 
 ## Exercises
 
