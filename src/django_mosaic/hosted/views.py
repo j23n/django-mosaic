@@ -75,7 +75,7 @@ def claim(request):
         "session": session,
         "tenant": existing,
         "base_domain": conf.base_domain(),
-        "claim_open": conf.claim_open(),
+        "claim_open": conf.claim_open() and conf.claim_allowed(session.did),
         "suggested": _suggest_subdomain(session.handle),
     }
     if request.method != "POST":
@@ -85,6 +85,9 @@ def claim(request):
         return redirect("hosted-claim")
     if not conf.claim_open():
         context["error"] = "New sites are currently closed — join the waitlist."
+        return render(request, "hosted/claim.html", context, status=403)
+    if not conf.claim_allowed(session.did):
+        context["error"] = "This instance does not accept claims for your account."
         return render(request, "hosted/claim.html", context, status=403)
 
     subdomain = (request.POST.get("subdomain") or "").strip().lower()

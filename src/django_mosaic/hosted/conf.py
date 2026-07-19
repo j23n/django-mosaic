@@ -18,6 +18,10 @@ DEFAULTS = {
     # Whether new tenants may claim subdomains. Turn off to freeze signups
     # while keeping existing tenants served.
     "CLAIM_OPEN": True,
+    # DIDs that may claim a site; empty means anyone (subject to CLAIM_OPEN).
+    # Lets a self-hoster pin claiming to their own DID from first boot instead
+    # of claiming and then flipping CLAIM_OPEN off.
+    "CLAIM_ALLOWED_DIDS": [],
 }
 
 # Always reserved regardless of settings — infrastructure and confusables.
@@ -77,3 +81,9 @@ def reserved_subdomains():
 
 def claim_open():
     return enabled() and bool(get_setting("CLAIM_OPEN"))
+
+
+def claim_allowed(did):
+    """Whether this DID may claim a site (CLAIM_ALLOWED_DIDS empty = anyone)."""
+    allowed = get_setting("CLAIM_ALLOWED_DIDS")
+    return not allowed or did in allowed

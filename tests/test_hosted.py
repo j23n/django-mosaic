@@ -256,6 +256,23 @@ class ClaimTest(TestCase):
         self.assertEqual(resp.status_code, 403)
         self.assertEqual(Tenant.objects.count(), 0)
 
+    def test_claim_pinned_to_allowed_dids(self):
+        self._sign_in()
+        pinned = {**HOSTED_ON, "CLAIM_ALLOWED_DIDS": ["did:plc:owner"]}
+        with override_settings(MOSAIC_HOSTED=pinned):
+            resp = self.client.get("/claim")
+            # The form is hidden for a disallowed DID, and a forged POST fails.
+            self.assertNotContains(resp, "<form")
+            resp = self.client.post("/claim", {"subdomain": "alice"})
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(Tenant.objects.count(), 0)
+
+        allowed = {**HOSTED_ON, "CLAIM_ALLOWED_DIDS": ["did:plc:alice"]}
+        with override_settings(MOSAIC_HOSTED=allowed):
+            resp = self.client.post("/claim", {"subdomain": "alice"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Tenant.objects.get().did, "did:plc:alice")
+
     def test_disabled_404s(self):
         with override_settings(MOSAIC_HOSTED={}):
             self.assertEqual(self.client.get("/claim").status_code, 404)
