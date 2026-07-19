@@ -450,6 +450,15 @@ where the render path is made to *verify* the binding, not just store it.
 - **Why a lazy OAuth import in the view?** So `import django_mosaic.hosted`
   succeeds without the `oauth` extra. The middleware, models, and admin have no
   crypto dependency; only `/claim` does, so only `/claim` pays for it.
+- **Why a DID allow-list (`CLAIM_ALLOWED_DIDS`) next to `CLAIM_OPEN`?**
+  *(added later, for the compose self-host stack — PR 13.)* `CLAIM_OPEN` is a
+  boolean about *everyone*, which forces a self-hoster into a claim-then-freeze
+  two-step — with a race window while the fresh instance is public. Pinning
+  claims to specific DIDs says "this home is mine" declaratively from first
+  boot. Two details worth reviewing: the check gates *claiming*, never serving
+  (existing tenants stay up if the list changes under them), and the claim form
+  is hidden for disallowed accounts while the POST path re-checks — the UI is a
+  courtesy, the server is the gate.
 
 ## Exercises
 
