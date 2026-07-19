@@ -127,6 +127,25 @@ class DomainCheckTest(TestCase):
         resp = self.client.get("/domains/check", {"domain": "alice.blog"})
         self.assertEqual(resp.status_code, 404)
 
+    def test_base_domain_ok(self):
+        resp = self.client.get("/domains/check", {"domain": "mosaic.example"})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_active_tenant_subdomain_ok(self):
+        _tenant()
+        resp = self.client.get("/domains/check", {"domain": "alice.mosaic.example"})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_unclaimed_suspended_or_nested_subdomain_refused(self):
+        _tenant(status=Tenant.STATUS_SUSPENDED)
+        for host in (
+            "ghost.mosaic.example",
+            "alice.mosaic.example",  # suspended
+            "deep.alice.mosaic.example",  # nested labels are never tenant hosts
+        ):
+            resp = self.client.get("/domains/check", {"domain": host})
+            self.assertEqual(resp.status_code, 404, host)
+
 
 @override_settings(MOSAIC_HOSTED=HOSTED_ON, ALLOWED_HOSTS=["*"], ROOT_URLCONF=__name__)
 class DashboardDomainTest(TestCase):

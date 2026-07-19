@@ -83,21 +83,36 @@ def tenant_wellknown_did(request):
 def domain_check(request):
     """The on-demand TLS `ask` endpoint (Caddy/others) on the base domain.
 
-    Returns 200 only for domains an active tenant has registered, so the
-    server never requests certificates for hosts we won't serve. Point
-    Caddy's `on_demand_tls { ask }` at this URL.
+    Returns 200 only for hosts we will actually serve — the base domain
+    itself, active tenants' subdomains, and registered custom domains — so
+    the server never requests certificates for anything else. Approving
+    subdomains here means an ingress with on-demand TLS needs no wildcard
+    certificate (and thus no DNS-challenge plumbing). Point Caddy's
+    `on_demand_tls { ask }` at this URL.
     """
     if not conf.enabled():
         raise Http404("Hosting is not enabled.")
     domain = (request.GET.get("domain") or "").lower().strip(".")
-    if (
-        domain
-        and Tenant.objects.filter(
-            custom_domain=domain, status=Tenant.STATUS_ACTIVE
-        ).exists()
-    ):
+    if domain and _serves_domain(domain):
         return HttpResponse("ok", content_type="text/plain")
     return HttpResponse("unknown domain", content_type="text/plain", status=404)
+
+
+def _serves_domain(domain):
+    """Whether this host is one mosaic serves (mirrors TenantMiddleware)."""
+    base = conf.base_domain()
+    if domain == base:
+        return True
+    if domain.endswith("." + base):
+        label = domain[: -len(base) - 1]
+        if "." in label:  # nested subdomains are never tenant hosts
+            return False
+        return Tenant.objects.filter(
+            subdomain=label, status=Tenant.STATUS_ACTIVE
+        ).exists()
+    return Tenant.objects.filter(
+        custom_domain=domain, status=Tenant.STATUS_ACTIVE
+    ).exists()
 
 
 @require_http_methods(["GET", "POST"])
